@@ -1,6 +1,6 @@
 # WB4 Dart Trainer
 
-A multi-mode dart practice training application for darts players of all skill levels.
+A multi-mode practice and training application for darts players of all skill levels.
 
 ## Copyright & Intellectual Property
 
