@@ -25,628 +25,326 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
+    // ============================================================================
+    // WB4 DART TRAINER - REBUILT WITH CLEAN ARCHITECTURE
+    // ============================================================================
+
+    // CUSTOM HOOK: Session Manager
+    const useSessionManager = () => {
+      const [sessions, setSessions] = useState([]);
+
+      useEffect(() => {
+        const saved = localStorage.getItem('wb4UnifiedSessionHistory');
+        if (saved) {
+          try {
+            setSessions(JSON.parse(saved));
+          } catch (e) {
+            console.error('Error loading sessions:', e);
+          }
+        }
+      }, []);
+
+      const addSession = (sessionData) => {
+        setSessions(prev => {
+          const updated = [sessionData, ...prev].slice(0, 20);
+          localStorage.setItem('wb4UnifiedSessionHistory', JSON.stringify(updated));
+          return updated;
+        });
+      };
+
+      const clearSessions = () => {
+        setSessions([]);
+        localStorage.removeItem('wb4UnifiedSessionHistory');
+      };
+
+      return { sessions, addSession, clearSessions };
+    };
+
+    // MAIN COMPONENT
     const WB4DartTrainer = () => {
       const [currentMode, setCurrentMode] = useState('double-in');
-      
-      // Double-Out specific state
-      const [currentNumber, setCurrentNumber] = useState(null);
-      const [doubleOutAttempts, setDoubleOutAttempts] = useState([]);
-      const [doubleOutStats, setDoubleOutStats] = useState({ total: 0, successes: 0, failures: 0, successRate: 0 });
-      const [consecutiveFailures, setConsecutiveFailures] = useState(0);
-      const [doubleOutSessionHistory, setDoubleOutSessionHistory] = useState([]);
-      const [doubleOutSessionStart, setDoubleOutSessionStart] = useState(null);
-      
-      // Double-In specific state
-      const [doubleInAttempts, setDoubleInAttempts] = useState([]);
-      const [doubleInStats, setDoubleInStats] = useState({ total: 0, successes: 0, failures: 0, successRate: 0 });
-      const [doubleInSessionHistory, setDoubleInSessionHistory] = useState([]);
-      const [doubleInSessionStart, setDoubleInSessionStart] = useState(null);
-      const [scoreInput, setScoreInput] = useState('');
-      
-      // Cricket specific state
-      const [cricketCurrentNumber, setCricketCurrentNumber] = useState(null);
-      const [cricketAttempts, setCricketAttempts] = useState([]);
-      const [cricketStats, setCricketStats] = useState({ total: 0, totalRounds: 0, avgRounds: 0 });
-      const [cricketSessionHistory, setCricketSessionHistory] = useState([]);
-      const [cricketSessionStart, setCricketSessionStart] = useState(null);
-      
-      // Shared state
-      const [userId, setUserId] = useState('');
       const [saveStatus, setSaveStatus] = useState('');
       const [confirmClear, setConfirmClear] = useState(false);
+      const { sessions, addSession, clearSessions } = useSessionManager();
 
-      // Priority doubles for Double-Out mode
+      const [diAttempts, setDiAttempts] = useState([]);
+      const [diSessionStart, setDiSessionStart] = useState(null);
+      const [diScoreInput, setDiScoreInput] = useState('');
+
+      const [doAttempts, setDoAttempts] = useState([]);
+      const [doSessionStart, setDoSessionStart] = useState(null);
+      const [doCurrentTarget, setDoCurrentTarget] = useState(null);
+      const [doConsecutiveFails, setDoConsecutiveFails] = useState(0);
+
+      const [crAttempts, setCrAttempts] = useState([]);
+      const [crSessionStart, setCrSessionStart] = useState(null);
+      const [crCurrentTarget, setCrCurrentTarget] = useState(null);
+
       const PRIORITY_DOUBLES = [16, 20, 8, 12];
-
-      // Cricket numbers
       const CRICKET_NUMBERS = [15, 16, 17, 18, 19, 20, 'Bull'];
 
-      // Set save status with auto-clear
-      const setSaveStatusWithTimeout = (message, timeout = 2000) => {
-        setSaveStatus(message);
+      const showStatus = (msg, timeout = 2000) => {
+        setSaveStatus(msg);
         setTimeout(() => setSaveStatus(''), timeout);
       };
 
-      // Calculate statistics
-      const calculateStats = (attemptsArray) => {
-        const total = attemptsArray.length;
-        const successes = attemptsArray.filter(attempt => attempt.outcome === 'success').length;
-        const successRate = total > 0 ? Math.round((successes / total) * 100) : 0;
-        return { total, successes, failures: total - successes, successRate };
+      const calculateStats = (attempts) => {
+        const total = attempts.length;
+        const successes = attempts.filter(a => a.outcome === 'success').length;
+        const rate = total > 0 ? Math.round((successes / total) * 100) : 0;
+        return { total, successes, failures: total - successes, successRate: rate };
       };
 
-      // Calculate cricket statistics
-      const calculateCricketStats = (attemptsArray) => {
-        const total = attemptsArray.length;
-        const totalRounds = attemptsArray.reduce((sum, attempt) => sum + (attempt.rounds || 0), 0);
-        const avgRounds = total > 0 ? (totalRounds / total).toFixed(2) : 0;
-        return { total, totalRounds, avgRounds };
+      const calculateCricketStats = (attempts) => {
+        const total = attempts.length;
+        const totalRounds = attempts.reduce((sum, a) => sum + (a.rounds || 0), 0);
+        const avg = total > 0 ? (totalRounds / total).toFixed(2) : 0;
+        return { total, totalRounds, avgRounds: avg };
       };
 
-      // Generate random cricket number with weighted probability
-      const generateRandomCricketNumber = () => {
-        const weights = {
-          15: 1,
-          16: 1,
-          17: 1,
-          18: 1,
-          19: 1,
-          20: 1,
-          'Bull': 0.2
-        };
-        
-        const totalWeight = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
-        let random = Math.random() * totalWeight;
-        
-        for (const [number, weight] of Object.entries(weights)) {
-          random -= weight;
-          if (random <= 0) {
-            return number === 'Bull' ? 'Bull' : parseInt(number);
-          }
-        }
-        return 20;
-      };
-
-      // Double-Out weighted random logic
-      const getBaseWeights = () => {
+      const generateDoubleOutTarget = () => {
         const weights = {};
         for (let i = 1; i <= 20; i++) {
           weights[i] = PRIORITY_DOUBLES.includes(i) ? 1.75 : 1;
         }
-        return weights;
+        if (doConsecutiveFails >= 4) {
+          const bonus = Math.floor((doConsecutiveFails - 3) * 2);
+          PRIORITY_DOUBLES.forEach(n => weights[n] += bonus);
+        }
+        const total = Object.values(weights).reduce((sum, w) => sum + w, 0);
+        let rand = Math.random() * total;
+        for (const [num, weight] of Object.entries(weights)) {
+          rand -= weight;
+          if (rand <= 0) return parseInt(num);
+        }
+        return 20;
       };
 
-      const getAdaptiveWeights = (failures) => {
-        const weights = getBaseWeights();
-        if (failures >= 4) {
-          const bonusWeight = Math.floor((failures - 3) * 2);
-          PRIORITY_DOUBLES.forEach(num => {
-            weights[num] += bonusWeight;
-          });
-        }
-        return weights;
-      };
-
-      const weightedRandom = (weights) => {
-        const totalWeight = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
-        let random = Math.random() * totalWeight;
-        
-        for (const [number, weight] of Object.entries(weights)) {
-          random -= weight;
-          if (random <= 0) {
-            return parseInt(number);
-          }
-        }
-        return 1;
-      };
-
-      const generateRandomNumber = () => {
-        const weights = getAdaptiveWeights(consecutiveFailures);
-        return weightedRandom(weights);
-      };
-
-      // Initialize app
-      useEffect(() => {
-        const projectStartTime = new Date('2025-09-17T00:00:00Z').getTime();
-        const newUserId = 'user_' + (Date.now() - projectStartTime);
-        setUserId(newUserId);
-
-        // Load Double-Out data
-        const savedDoubleOutAttempts = localStorage.getItem('wb4DoubleOutAttempts');
-        if (savedDoubleOutAttempts) {
-          try {
-            const parsedAttempts = JSON.parse(savedDoubleOutAttempts);
-            setDoubleOutAttempts(parsedAttempts);
-            setDoubleOutStats(calculateStats(parsedAttempts));
-          } catch (e) {
-            console.error('Error parsing Double-Out attempts:', e);
-          }
-        }
-
-        const savedFailures = localStorage.getItem('wb4ConsecutiveFailures');
-        setConsecutiveFailures(savedFailures ? parseInt(savedFailures) : 0);
-
-        const savedDoubleOutSessionHistory = localStorage.getItem('wb4DoubleOutSessionHistory');
-        if (savedDoubleOutSessionHistory) {
-          try {
-            const parsedHistory = JSON.parse(savedDoubleOutSessionHistory);
-            setDoubleOutSessionHistory(parsedHistory);
-          } catch (e) {
-            console.error('Error parsing Double-Out history:', e);
-          }
-        }
-
-        const savedDoubleOutSessionStart = localStorage.getItem('wb4DoubleOutSessionStart');
-        if (savedDoubleOutSessionStart) {
-          setDoubleOutSessionStart(new Date(savedDoubleOutSessionStart));
-        }
-
-        // Load Double-In data
-        const savedDoubleInAttempts = localStorage.getItem('wb4DoubleInAttempts');
-        if (savedDoubleInAttempts) {
-          try {
-            const parsedAttempts = JSON.parse(savedDoubleInAttempts);
-            setDoubleInAttempts(parsedAttempts);
-            setDoubleInStats(calculateStats(parsedAttempts));
-          } catch (e) {
-            console.error('Error parsing Double-In attempts:', e);
-          }
-        }
-
-        const savedDoubleInSessionHistory = localStorage.getItem('wb4DoubleInSessionHistory');
-        if (savedDoubleInSessionHistory) {
-          try {
-            const parsedHistory = JSON.parse(savedDoubleInSessionHistory);
-            setDoubleInSessionHistory(parsedHistory);
-          } catch (e) {
-            console.error('Error parsing Double-In history:', e);
-          }
-        }
-
-        const savedDoubleInSessionStart = localStorage.getItem('wb4DoubleInSessionStart');
-        if (savedDoubleInSessionStart) {
-          setDoubleInSessionStart(new Date(savedDoubleInSessionStart));
-        }
-
-        // Load Cricket data
-        const savedCricketAttempts = localStorage.getItem('wb4CricketAttempts');
-        if (savedCricketAttempts) {
-          try {
-            const parsedAttempts = JSON.parse(savedCricketAttempts);
-            setCricketAttempts(parsedAttempts);
-            setCricketStats(calculateCricketStats(parsedAttempts));
-          } catch (e) {
-            console.error('Error parsing Cricket attempts:', e);
-          }
-        }
-
-        const savedCricketSessionHistory = localStorage.getItem('wb4CricketSessionHistory');
-        if (savedCricketSessionHistory) {
-          try {
-            const parsedHistory = JSON.parse(savedCricketSessionHistory);
-            setCricketSessionHistory(parsedHistory);
-          } catch (e) {
-            console.error('Error parsing Cricket history:', e);
-          }
-        }
-
-        const savedCricketSessionStart = localStorage.getItem('wb4CricketSessionStart');
-        if (savedCricketSessionStart) {
-          setCricketSessionStart(new Date(savedCricketSessionStart));
-        }
-      }, []);
-
-      // Generate first number for Double-Out and Cricket modes
-      useEffect(() => {
-        if (currentMode === 'double-out' && currentNumber === null) {
-          const weights = getAdaptiveWeights(consecutiveFailures);
-          setCurrentNumber(weightedRandom(weights));
-        }
-        if (currentMode === 'cricket' && cricketCurrentNumber === null) {
-          setCricketCurrentNumber(generateRandomCricketNumber());
-        }
-      }, [consecutiveFailures, currentNumber, cricketCurrentNumber, currentMode]);
-
-      // Mode switching
-      const switchMode = (newMode) => {
-        setCurrentMode(newMode);
-        if (newMode === 'double-out' && currentNumber === null) {
-          setCurrentNumber(generateRandomNumber());
-        }
-        if (newMode === 'cricket' && cricketCurrentNumber === null) {
-          setCricketCurrentNumber(generateRandomCricketNumber());
-        }
-        const modeNames = {
-          'double-out': 'Double-Out',
-          'double-in': 'Double-In',
-          'cricket': 'Cricket'
-        };
-        setSaveStatusWithTimeout(`🔄 Switched to ${modeNames[newMode]} mode`, 1500);
-      };
-
-      // Double-Out functions
-      const skipTarget = () => {
-        setCurrentNumber(generateRandomNumber());
-        setSaveStatusWithTimeout('🎲 New target generated', 1000);
-      };
-
-      const recordDoubleOutOutcome = (outcome) => {
+      const recordDoubleOut = (outcome) => {
         const now = new Date();
-        
-        if (doubleOutAttempts.length === 0 && !doubleOutSessionStart) {
-          setDoubleOutSessionStart(now);
-        }
+        if (doAttempts.length === 0) setDoSessionStart(now);
 
-        const newAttempt = {
-          number: currentNumber,
-          outcome: outcome,
+        const attempt = {
+          number: doCurrentTarget,
+          outcome,
           timestamp: now.toLocaleTimeString()
         };
 
-        const newAttempts = [newAttempt, ...doubleOutAttempts];
-        setDoubleOutAttempts(newAttempts);
-        setDoubleOutStats(calculateStats(newAttempts));
-
-        if (outcome === 'success') {
-          setConsecutiveFailures(0);
-        } else if (outcome === 'fail') {
-          const newFailures = consecutiveFailures + 1;
-          setConsecutiveFailures(newFailures);
-        }
-
-        setSaveStatusWithTimeout('💾 Saved to browser', 1000);
-        setCurrentNumber(generateRandomNumber());
+        setDoAttempts(prev => [attempt, ...prev]);
+        setDoConsecutiveFails(outcome === 'success' ? 0 : doConsecutiveFails + 1);
+        setDoCurrentTarget(generateDoubleOutTarget());
+        showStatus('💾 Saved', 1000);
       };
 
-      const endDoubleOutSession = () => {
-        if (doubleOutAttempts.length > 0 && doubleOutSessionStart) {
-          const sessionEndTime = new Date();
-          const sessionDuration = Math.round((sessionEndTime - doubleOutSessionStart) / 60000);
-          
-          const sessionSummary = {
-            id: Date.now(),
-            startTime: doubleOutSessionStart.toISOString(),
-            endTime: sessionEndTime.toISOString(),
-            duration: sessionDuration,
-            totalAttempts: doubleOutStats.total,
-            successRate: doubleOutStats.successRate,
-            successes: doubleOutStats.successes,
-            failures: doubleOutStats.failures
-          };
-
-          const newSessionHistory = [sessionSummary, ...doubleOutSessionHistory].slice(0, 5);
-          setDoubleOutSessionHistory(newSessionHistory);
-          localStorage.setItem('wb4DoubleOutSessionHistory', JSON.stringify(newSessionHistory));
-        }
-
-        setDoubleOutAttempts([]);
-        setDoubleOutStats({ total: 0, successes: 0, failures: 0, successRate: 0 });
-        setConsecutiveFailures(0);
-        setDoubleOutSessionStart(null);
-        setCurrentNumber(generateRandomNumber());
-        setSaveStatusWithTimeout('📊 Session ended', 1500);
-      };
-
-      // Double-In functions
-      const recordDoubleInOutcome = (outcome) => {
-        const now = new Date();
+      const saveDoubleOutSession = () => {
+        if (doAttempts.length === 0) return;
         
-        if (doubleInAttempts.length === 0 && !doubleInSessionStart) {
-          setDoubleInSessionStart(now);
-        }
+        const stats = calculateStats(doAttempts);
+        const duration = Math.round((new Date() - doSessionStart) / 60000);
+        
+        addSession({
+          id: Date.now(),
+          mode: 'double-out',
+          startTime: doSessionStart.toISOString(),
+          endTime: new Date().toISOString(),
+          duration,
+          totalAttempts: stats.total,
+          successRate: stats.successRate,
+          successes: stats.successes,
+          failures: stats.failures
+        });
 
-        let validScore = null;
-        if (outcome === 'success') {
-          const score = parseInt(scoreInput);
-          if (scoreInput && score >= 2 && score <= 170) {
-            validScore = score;
-          } else if (scoreInput) {
-            setSaveStatusWithTimeout('⚠️ Score must be between 2-170', 2000);
+        setDoAttempts([]);
+        setDoSessionStart(null);
+        setDoConsecutiveFails(0);
+        setDoCurrentTarget(generateDoubleOutTarget());
+        showStatus('📊 Session saved', 1500);
+      };
+
+      const recordDoubleIn = (outcome) => {
+        const now = new Date();
+        if (diAttempts.length === 0) setDiSessionStart(now);
+
+        let score = null;
+        if (outcome === 'success' && diScoreInput) {
+          const val = parseInt(diScoreInput);
+          if (val >= 2 && val <= 170) {
+            score = val;
+            setDiScoreInput('');
+          } else {
+            showStatus('⚠️ Score must be 2-170', 2000);
             return;
           }
         }
 
-        const newAttempt = {
-          outcome: outcome,
-          score: validScore,
-          timestamp: now.toLocaleTimeString()
-        };
-
-        const newAttempts = [newAttempt, ...doubleInAttempts];
-        setDoubleInAttempts(newAttempts);
-        setDoubleInStats(calculateStats(newAttempts));
-        
-        if (outcome === 'success') {
-          setScoreInput('');
-        }
-        
-        setSaveStatusWithTimeout('💾 Saved to browser', 1000);
+        const attempt = { outcome, score, timestamp: now.toLocaleTimeString() };
+        setDiAttempts(prev => [attempt, ...prev]);
+        showStatus('💾 Saved', 1000);
       };
 
-      const endDoubleInSession = () => {
-        if (doubleInAttempts.length > 0 && doubleInSessionStart) {
-          const sessionEndTime = new Date();
-          const sessionDuration = Math.round((sessionEndTime - doubleInSessionStart) / 60000);
-          
-          const successfulScores = doubleInAttempts
-            .filter(attempt => attempt.outcome === 'success' && attempt.score)
-            .map(attempt => attempt.score);
-          const totalScore = successfulScores.reduce((sum, score) => sum + score, 0);
-          const expectedValue = doubleInAttempts.length > 0 ? (totalScore / doubleInAttempts.length).toFixed(1) : 0;
-          
-          const sessionSummary = {
-            id: Date.now(),
-            startTime: doubleInSessionStart.toISOString(),
-            endTime: sessionEndTime.toISOString(),
-            duration: sessionDuration,
-            totalAttempts: doubleInStats.total,
-            successRate: doubleInStats.successRate,
-            successes: doubleInStats.successes,
-            failures: doubleInStats.failures,
-            expectedValue: parseFloat(expectedValue)
-          };
+      const saveDoubleInSession = () => {
+        if (diAttempts.length === 0) return;
 
-          const newSessionHistory = [sessionSummary, ...doubleInSessionHistory].slice(0, 5);
-          setDoubleInSessionHistory(newSessionHistory);
-          localStorage.setItem('wb4DoubleInSessionHistory', JSON.stringify(newSessionHistory));
-        }
+        const stats = calculateStats(diAttempts);
+        const duration = Math.round((new Date() - diSessionStart) / 60000);
+        const scores = diAttempts.filter(a => a.outcome === 'success' && a.score).map(a => a.score);
+        const totalScore = scores.reduce((sum, s) => sum + s, 0);
+        const expectedValue = diAttempts.length > 0 ? (totalScore / diAttempts.length).toFixed(1) : 0;
 
-        setDoubleInAttempts([]);
-        setDoubleInStats({ total: 0, successes: 0, failures: 0, successRate: 0 });
-        setDoubleInSessionStart(null);
-        setSaveStatusWithTimeout('📊 Session ended', 1500);
+        addSession({
+          id: Date.now(),
+          mode: 'double-in',
+          startTime: diSessionStart.toISOString(),
+          endTime: new Date().toISOString(),
+          duration,
+          totalAttempts: stats.total,
+          successRate: stats.successRate,
+          successes: stats.successes,
+          failures: stats.failures,
+          expectedValue: parseFloat(expectedValue)
+        });
+
+        setDiAttempts([]);
+        setDiSessionStart(null);
+        showStatus('📊 Session saved', 1500);
       };
 
-      // Cricket functions
-      const recordCricketOutcome = (rounds) => {
+      const generateCricketTarget = () => {
+        const weights = { 15: 1, 16: 1, 17: 1, 18: 1, 19: 1, 20: 1, 'Bull': 0.2 };
+        const total = Object.values(weights).reduce((sum, w) => sum + w, 0);
+        let rand = Math.random() * total;
+        for (const [num, weight] of Object.entries(weights)) {
+          rand -= weight;
+          if (rand <= 0) return num === 'Bull' ? 'Bull' : parseInt(num);
+        }
+        return 20;
+      };
+
+      const recordCricket = (rounds) => {
         const now = new Date();
-        
-        if (cricketAttempts.length === 0 && !cricketSessionStart) {
-          setCricketSessionStart(now);
-        }
+        if (crAttempts.length === 0) setCrSessionStart(now);
 
-        const newAttempt = {
-          number: cricketCurrentNumber,
-          rounds: rounds,
+        const attempt = {
+          number: crCurrentTarget,
+          rounds,
           timestamp: now.toLocaleTimeString()
         };
 
-        const newAttempts = [newAttempt, ...cricketAttempts];
-        setCricketAttempts(newAttempts);
-        setCricketStats(calculateCricketStats(newAttempts));
-
-        setSaveStatusWithTimeout('💾 Saved to browser', 1000);
-        setCricketCurrentNumber(generateRandomCricketNumber());
+        setCrAttempts(prev => [attempt, ...prev]);
+        setCrCurrentTarget(generateCricketTarget());
+        showStatus('💾 Saved', 1000);
       };
 
-      const endCricketSession = () => {
-        if (cricketAttempts.length > 0 && cricketSessionStart) {
-          const sessionEndTime = new Date();
-          const sessionDuration = Math.round((sessionEndTime - cricketSessionStart) / 60000);
-          
-          const sessionSummary = {
-            id: Date.now(),
-            startTime: cricketSessionStart.toISOString(),
-            endTime: sessionEndTime.toISOString(),
-            duration: sessionDuration,
-            totalAttempts: cricketStats.total,
-            totalRounds: cricketStats.totalRounds,
-            avgRounds: cricketStats.avgRounds
-          };
+      const saveCricketSession = () => {
+        if (crAttempts.length === 0) return;
 
-          const newSessionHistory = [sessionSummary, ...cricketSessionHistory].slice(0, 5);
-          setCricketSessionHistory(newSessionHistory);
-          localStorage.setItem('wb4CricketSessionHistory', JSON.stringify(newSessionHistory));
+        const stats = calculateCricketStats(crAttempts);
+        const duration = Math.round((new Date() - crSessionStart) / 60000);
+
+        addSession({
+          id: Date.now(),
+          mode: 'cricket',
+          startTime: crSessionStart.toISOString(),
+          endTime: new Date().toISOString(),
+          duration,
+          totalAttempts: stats.total,
+          totalRounds: stats.totalRounds,
+          avgRounds: stats.avgRounds
+        });
+
+        setCrAttempts([]);
+        setCrSessionStart(null);
+        setCrCurrentTarget(generateCricketTarget());
+        showStatus('📊 Session saved', 1500);
+      };
+
+      useEffect(() => {
+        if (currentMode === 'double-out' && !doCurrentTarget) {
+          setDoCurrentTarget(generateDoubleOutTarget());
         }
+        if (currentMode === 'cricket' && !crCurrentTarget) {
+          setCrCurrentTarget(generateCricketTarget());
+        }
+      }, [currentMode, doCurrentTarget, crCurrentTarget]);
 
-        setCricketAttempts([]);
-        setCricketStats({ total: 0, totalRounds: 0, avgRounds: 0 });
-        setCricketSessionStart(null);
-        setCricketCurrentNumber(generateRandomCricketNumber());
-        setSaveStatusWithTimeout('📊 Session ended', 1500);
-      };
-
-      // Clear all data
       const clearAllData = () => {
-        // Clear Double-Out data
-        setDoubleOutAttempts([]);
-        setDoubleOutStats({ total: 0, successes: 0, failures: 0, successRate: 0 });
-        setConsecutiveFailures(0);
-        setDoubleOutSessionStart(null);
-        setDoubleOutSessionHistory([]);
-        localStorage.removeItem('wb4DoubleOutAttempts');
-        localStorage.removeItem('wb4ConsecutiveFailures');
-        localStorage.removeItem('wb4DoubleOutSessionStart');
-        localStorage.removeItem('wb4DoubleOutSessionHistory');
-        
-        // Clear Double-In data
-        setDoubleInAttempts([]);
-        setDoubleInStats({ total: 0, successes: 0, failures: 0, successRate: 0 });
-        setDoubleInSessionStart(null);
-        setDoubleInSessionHistory([]);
-        localStorage.removeItem('wb4DoubleInAttempts');
-        localStorage.removeItem('wb4DoubleInSessionStart');
-        localStorage.removeItem('wb4DoubleInSessionHistory');
-        
-        // Clear Cricket data
-        setCricketAttempts([]);
-        setCricketStats({ total: 0, totalRounds: 0, avgRounds: 0 });
-        setCricketSessionStart(null);
-        setCricketSessionHistory([]);
-        localStorage.removeItem('wb4CricketAttempts');
-        localStorage.removeItem('wb4CricketSessionStart');
-        localStorage.removeItem('wb4CricketSessionHistory');
-        
-        // Clear shared data
-        localStorage.removeItem('wb4DartPracticeUserId');
-        
-        if (currentMode === 'double-out') {
-          setCurrentNumber(generateRandomNumber());
-        } else if (currentMode === 'cricket') {
-          setCricketCurrentNumber(generateRandomCricketNumber());
-        }
-        
-        // Reset confirmation checkbox
+        setDiAttempts([]);
+        setDiSessionStart(null);
+        setDoAttempts([]);
+        setDoSessionStart(null);
+        setDoConsecutiveFails(0);
+        setCrAttempts([]);
+        setCrSessionStart(null);
+        clearSessions();
         setConfirmClear(false);
-        
-        setSaveStatusWithTimeout('🧹 All data cleared');
+        showStatus('🧹 All data cleared');
       };
 
-      // Get current mode data
       const getCurrentAttempts = () => {
-        if (currentMode === 'double-out') return doubleOutAttempts;
-        if (currentMode === 'double-in') return doubleInAttempts;
-        return cricketAttempts;
-      };
-      
-      const getCurrentStats = () => {
-        if (currentMode === 'double-out') return doubleOutStats;
-        if (currentMode === 'double-in') return doubleInStats;
-        return cricketStats;
-      };
-      
-      const getCurrentSessionHistory = () => {
-        if (currentMode === 'double-out') return doubleOutSessionHistory;
-        if (currentMode === 'double-in') return doubleInSessionHistory;
-        return cricketSessionHistory;
+        if (currentMode === 'double-in') return diAttempts;
+        if (currentMode === 'double-out') return doAttempts;
+        if (currentMode === 'cricket') return crAttempts;
+        return [];
       };
 
-      // Shared styles
-      const buttonBaseStyle = "font-black py-4 px-4 rounded-lg text-lg transition-all transform hover:scale-105 shadow-lg";
-      const goldGradient = { background: 'linear-gradient(45deg, #ffd700, #ffed4a)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' };
+      const getCurrentStats = () => {
+        if (currentMode === 'double-in') return calculateStats(diAttempts);
+        if (currentMode === 'double-out') return calculateStats(doAttempts);
+        if (currentMode === 'cricket') return calculateCricketStats(crAttempts);
+        return { total: 0, successes: 0, failures: 0, successRate: 0 };
+      };
+
+      const goldGradient = {
+        background: 'linear-gradient(45deg, #ffd700, #ffed4a)',
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent'
+      };
+
+      const btnStyle = "font-black py-4 px-4 rounded-lg text-lg transition-all transform hover:scale-105 shadow-lg";
 
       return (
         <div className="min-h-screen bg-black text-white p-4" style={{background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)'}}>
           <div className="max-w-md mx-auto">
             
-            {/* Header */}
             <div className="text-center mb-6">
               <h1 className="text-3xl font-bold mb-2" style={goldGradient}>WB4 DART TRAINER</h1>
             </div>
 
-            {/* Mode Selector */}
             <div className="bg-gray-900 rounded-full p-2 mb-6 border border-gray-800">
-              <div className="grid grid-cols-3 gap-1">
-                <button
-                  onClick={() => switchMode('double-in')}
-                  className={`py-2 px-4 rounded-full text-xs font-bold transition-all duration-200 ${
-                    currentMode === 'double-in' 
-                      ? 'text-black border-2 border-yellow-400' 
-                      : 'text-gray-300 border-2 border-gray-600 hover:border-gray-500'
-                  }`}
-                  style={currentMode === 'double-in' ? 
-                    {background: 'linear-gradient(45deg, #ffd700, #ffed4a)', textShadow: '1px 1px 2px rgba(0,0,0,0.3)'} :
-                    {background: 'linear-gradient(145deg, #374151, #1f2937)'}
-                  }
-                >
-                  DOUBLE-IN
-                </button>
-                <button
-                  onClick={() => switchMode('double-out')}
-                  className={`py-2 px-4 rounded-full text-xs font-bold transition-all duration-200 ${
-                    currentMode === 'double-out' 
-                      ? 'text-black border-2 border-yellow-400' 
-                      : 'text-gray-300 border-2 border-gray-600 hover:border-gray-500'
-                  }`}
-                  style={currentMode === 'double-out' ? 
-                    {background: 'linear-gradient(45deg, #ffd700, #ffed4a)', textShadow: '1px 1px 2px rgba(0,0,0,0.3)'} :
-                    {background: 'linear-gradient(145deg, #374151, #1f2937)'}
-                  }
-                >
-                  DOUBLE-OUT
-                </button>
-                <button
-                  onClick={() => switchMode('cricket')}
-                  className={`py-2 px-4 rounded-full text-xs font-bold transition-all duration-200 ${
-                    currentMode === 'cricket' 
-                      ? 'text-black border-2 border-yellow-400' 
-                      : 'text-gray-300 border-2 border-gray-600 hover:border-gray-500'
-                  }`}
-                  style={currentMode === 'cricket' ? 
-                    {background: 'linear-gradient(45deg, #ffd700, #ffed4a)', textShadow: '1px 1px 2px rgba(0,0,0,0.3)'} :
-                    {background: 'linear-gradient(145deg, #374151, #1f2937)'}
-                  }
-                >
-                  CRICKET
-                </button>
+              <div className="grid grid-cols-4 gap-1">
+                {['double-in', 'double-out', 'cricket', 'history'].map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => setCurrentMode(mode)}
+                    className={`py-2 px-2 rounded-full text-xs font-bold transition-all duration-200 ${
+                      currentMode === mode 
+                        ? 'text-black border-2 border-yellow-400' 
+                        : 'text-gray-300 border-2 border-gray-600 hover:border-gray-500'
+                    }`}
+                    style={currentMode === mode ? 
+                      {background: 'linear-gradient(45deg, #ffd700, #ffed4a)', textShadow: '1px 1px 2px rgba(0,0,0,0.3)'} :
+                      {background: 'linear-gradient(145deg, #374151, #1f2937)'}
+                    }
+                  >
+                    {mode === 'double-in' && 'DOUBLE-IN'}
+                    {mode === 'double-out' && 'DOUBLE-OUT'}
+                    {mode === 'cricket' && 'CRICKET'}
+                    {mode === 'history' && 'HISTORY'}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Double-Out Mode Content */}
-            {currentMode === 'double-out' && (
-              <>
-                {/* Target Display */}
-                <div className="bg-gray-900 rounded-lg p-8 text-center mb-6 shadow-2xl border-2 border-yellow-500" 
-                     style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
-                  <p className="text-lg mb-2 text-pink-400 font-semibold">TARGET DOUBLE:</p>
-                  <div className="text-6xl font-black mb-4" style={goldGradient}>
-                    {currentNumber ? `D${currentNumber}` : '...'}
-                  </div>
-                  <p className="text-gray-300 text-sm font-medium">
-                    {currentNumber ? 'You have three darts to get out.' : ''}
-                  </p>
-                </div>
-
-                {/* Double-Out Action Buttons */}
-                <div className="grid grid-cols-4 gap-2 mb-6">
-                  <button
-                    onClick={() => recordDoubleOutOutcome('success')}
-                    className={`${buttonBaseStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`}
-                    style={{background: 'linear-gradient(145deg, #374151, #1f2937)', boxShadow: '0 8px 16px rgba(0,0,0,0.3)'}}
-                    disabled={!currentNumber}
-                  >
-                    <div className="text-lg mb-1">✅</div>
-                    <div className="text-xs font-bold">HIT IT!</div>
-                  </button>
-                  <button
-                    onClick={() => recordDoubleOutOutcome('fail')}
-                    className={`${buttonBaseStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`}
-                    style={{background: 'linear-gradient(145deg, #374151, #1f2937)', boxShadow: '0 8px 16px rgba(0,0,0,0.3)'}}
-                    disabled={!currentNumber}
-                  >
-                    <div className="text-lg mb-1">❌</div>
-                    <div className="text-xs font-bold">MISSED</div>
-                  </button>
-                  <button
-                    onClick={skipTarget}
-                    className={`${buttonBaseStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`}
-                    style={{background: 'linear-gradient(145deg, #374151, #1f2937)', boxShadow: '0 8px 16px rgba(0,0,0,0.3)'}}
-                    disabled={!currentNumber}
-                  >
-                    <div className="text-lg mb-1">➡️</div>
-                    <div className="text-xs font-bold">SKIP</div>
-                  </button>
-                  <button
-                    onClick={endDoubleOutSession}
-                    className={`${buttonBaseStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`}
-                    style={{background: 'linear-gradient(145deg, #374151, #1f2937)', boxShadow: '0 8px 16px rgba(0,0,0,0.3)'}}
-                    disabled={doubleOutAttempts.length === 0}
-                  >
-                    <div className="text-lg mb-1">💾</div>
-                    <div className="text-xs font-bold">SAVE</div>
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* Double-In Mode Content */}
             {currentMode === 'double-in' && (
               <>
-                {/* Score Input */}
                 <div className="bg-gray-900 rounded-lg p-8 text-center mb-6 shadow-2xl border-2 border-yellow-500" 
                      style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
                   <p className="text-lg mb-4 text-pink-400 font-semibold">WHAT'D YOU HIT?</p>
                   <input
                     type="number"
-                    value={scoreInput}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === '' || /^\d+$/.test(value)) {
-                        setScoreInput(value);
-                      }
-                    }}
+                    value={diScoreInput}
+                    onChange={(e) => setDiScoreInput(e.target.value)}
                     className="text-3xl font-bold text-center bg-gray-800 text-yellow-400 rounded p-3 w-32 border-2 border-yellow-500 focus:border-yellow-300 focus:outline-none"
-                    style={{WebkitAppearance: 'none', MozAppearance: 'textfield'}}
                     min="2"
                     max="170"
                     inputMode="numeric"
@@ -654,30 +352,16 @@
                   <p className="text-gray-300 text-sm mt-4">You have three darts to get in.</p>
                 </div>
 
-                {/* Double-In Action Buttons */}
                 <div className="grid grid-cols-3 gap-3 mb-6">
-                  <button
-                    onClick={() => recordDoubleInOutcome('success')}
-                    className={`${buttonBaseStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`}
-                    style={{background: 'linear-gradient(145deg, #374151, #1f2937)', boxShadow: '0 8px 16px rgba(0,0,0,0.3)'}}
-                  >
+                  <button onClick={() => recordDoubleIn('success')} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
                     <div className="text-lg mb-1">✅</div>
                     <div className="text-xs font-bold">GOT IN!</div>
                   </button>
-                  <button
-                    onClick={() => recordDoubleInOutcome('fail')}
-                    className={`${buttonBaseStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`}
-                    style={{background: 'linear-gradient(145deg, #374151, #1f2937)', boxShadow: '0 8px 16px rgba(0,0,0,0.3)'}}
-                  >
+                  <button onClick={() => recordDoubleIn('fail')} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
                     <div className="text-lg mb-1">❌</div>
                     <div className="text-xs font-bold">MISSED</div>
                   </button>
-                  <button
-                    onClick={endDoubleInSession}
-                    className={`${buttonBaseStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`}
-                    style={{background: 'linear-gradient(145deg, #374151, #1f2937)', boxShadow: '0 8px 16px rgba(0,0,0,0.3)'}}
-                    disabled={doubleInAttempts.length === 0}
-                  >
+                  <button onClick={saveDoubleInSession} disabled={diAttempts.length === 0} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
                     <div className="text-lg mb-1">💾</div>
                     <div className="text-xs font-bold">SAVE</div>
                   </button>
@@ -685,275 +369,198 @@
               </>
             )}
 
-            {/* Cricket Mode Content */}
-            {currentMode === 'cricket' && (
+            {currentMode === 'double-out' && (
               <>
-                {/* Target Display */}
                 <div className="bg-gray-900 rounded-lg p-8 text-center mb-6 shadow-2xl border-2 border-yellow-500" 
                      style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
-                  <p className="text-lg mb-2 text-pink-400 font-semibold">TARGET NUMBER:</p>
+                  <p className="text-lg mb-2 text-pink-400 font-semibold">TARGET DOUBLE:</p>
                   <div className="text-6xl font-black mb-4" style={goldGradient}>
-                    {cricketCurrentNumber ? cricketCurrentNumber : '...'}
+                    {doCurrentTarget ? `D${doCurrentTarget}` : '...'}
                   </div>
-                  <p className="text-gray-300 text-sm font-medium">
-                    {cricketCurrentNumber ? 'Hit as many as you can with three darts.' : ''}
-                  </p>
+                  <p className="text-gray-300 text-sm font-medium">You have three darts to get out.</p>
                 </div>
 
-                {/* Cricket Score Buttons - Conditional based on target */}
-                {cricketCurrentNumber === 'Bull' ? (
-                  <>
-                    {/* Bullseye Buttons: Miss, C1, C2 */}
-                    <div className="grid grid-cols-3 gap-2 mb-2">
-                      <button
-                        onClick={() => recordCricketOutcome(0)}
-                        className={`${buttonBaseStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`}
-                        style={{background: 'linear-gradient(145deg, #374151, #1f2937)', boxShadow: '0 8px 16px rgba(0,0,0,0.3)'}}
-                      >
-                        MISS
-                      </button>
-                      {[1, 2].map(count => (
-                        <button
-                          key={count}
-                          onClick={() => recordCricketOutcome(count)}
-                          className={`${buttonBaseStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`}
-                          style={{background: 'linear-gradient(145deg, #374151, #1f2937)', boxShadow: '0 8px 16px rgba(0,0,0,0.3)'}}
-                        >
-                          C{count}
-                        </button>
-                      ))}
-                    </div>
-                    {/* Bullseye Buttons: C3-C6 */}
-                    <div className="grid grid-cols-4 gap-2 mb-6">
-                      {[3, 4, 5, 6].map(count => (
-                        <button
-                          key={count}
-                          onClick={() => recordCricketOutcome(count)}
-                          className={`${buttonBaseStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`}
-                          style={{background: 'linear-gradient(145deg, #374151, #1f2937)', boxShadow: '0 8px 16px rgba(0,0,0,0.3)'}}
-                        >
-                          C{count}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {/* Regular Number Buttons: Miss, R1-R4 */}
-                    <div className="grid grid-cols-5 gap-2 mb-2">
-                      <button
-                        onClick={() => recordCricketOutcome(0)}
-                        className={`${buttonBaseStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`}
-                        style={{background: 'linear-gradient(145deg, #374151, #1f2937)', boxShadow: '0 8px 16px rgba(0,0,0,0.3)'}}
-                        disabled={!cricketCurrentNumber}
-                      >
-                        MISS
-                      </button>
-                      {[1, 2, 3, 4].map(rounds => (
-                        <button
-                          key={rounds}
-                          onClick={() => recordCricketOutcome(rounds)}
-                          className={`${buttonBaseStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`}
-                          style={{background: 'linear-gradient(145deg, #374151, #1f2937)', boxShadow: '0 8px 16px rgba(0,0,0,0.3)'}}
-                          disabled={!cricketCurrentNumber}
-                        >
-                          R{rounds}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Regular Number Buttons: R5-R9 */}
-                    <div className="grid grid-cols-5 gap-2 mb-6">
-                      {[5, 6, 7, 8, 9].map(rounds => (
-                        <button
-                          key={rounds}
-                          onClick={() => recordCricketOutcome(rounds)}
-                          className={`${buttonBaseStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`}
-                          style={{background: 'linear-gradient(145deg, #374151, #1f2937)', boxShadow: '0 8px 16px rgba(0,0,0,0.3)'}}
-                          disabled={!cricketCurrentNumber}
-                        >
-                          R{rounds}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                {/* Save Session Button */}
-                <div className="mb-6">
-                  <button
-                    onClick={endCricketSession}
-                    className={`w-full ${buttonBaseStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex items-center justify-center`}
-                    style={{background: 'linear-gradient(145deg, #374151, #1f2937)', boxShadow: '0 8px 16px rgba(0,0,0,0.3)'}}
-                    disabled={cricketAttempts.length === 0}
-                  >
-                    <div className="text-lg mr-2">💾</div>
-                    <div className="text-xs font-bold">SAVE SESSION</div>
+                <div className="grid grid-cols-4 gap-2 mb-6">
+                  <button onClick={() => recordDoubleOut('success')} disabled={!doCurrentTarget} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
+                    <div className="text-lg mb-1">✅</div>
+                    <div className="text-xs font-bold">HIT IT!</div>
+                  </button>
+                  <button onClick={() => recordDoubleOut('fail')} disabled={!doCurrentTarget} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
+                    <div className="text-lg mb-1">❌</div>
+                    <div className="text-xs font-bold">MISSED</div>
+                  </button>
+                  <button onClick={() => setDoCurrentTarget(generateDoubleOutTarget())} disabled={!doCurrentTarget} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
+                    <div className="text-lg mb-1">➡️</div>
+                    <div className="text-xs font-bold">SKIP</div>
+                  </button>
+                  <button onClick={saveDoubleOutSession} disabled={doAttempts.length === 0} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
+                    <div className="text-lg mb-1">💾</div>
+                    <div className="text-xs font-bold">SAVE</div>
                   </button>
                 </div>
               </>
             )}
 
-            {/* Statistics */}
-            <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-              <h3 className="text-lg font-bold mb-3 text-pink-400">📊 STATS</h3>
-              {currentMode === 'cricket' ? (
-                <div className="grid grid-cols-2 gap-4 text-center">
-                  {[
-                    { label: 'TOTAL ATTEMPTS', value: cricketStats.total, color: 'text-yellow-400' },
-                    { label: 'AVG ROUNDS', value: cricketStats.avgRounds, color: goldGradient }
-                  ].map(({ label, value, color }, index) => (
-                    <div key={index}>
-                      <div className={`text-2xl font-bold ${typeof color === 'string' ? color : ''}`} 
-                           style={typeof color === 'object' ? color : {}}>
-                        {value}
-                      </div>
-                      <div className="text-sm text-gray-300 font-medium">{label}</div>
-                    </div>
-                  ))}
+            {currentMode === 'cricket' && (
+              <>
+                <div className="bg-gray-900 rounded-lg p-8 text-center mb-6 shadow-2xl border-2 border-yellow-500" 
+                     style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
+                  <p className="text-lg mb-2 text-pink-400 font-semibold">TARGET NUMBER:</p>
+                  <div className="text-6xl font-black mb-4" style={goldGradient}>
+                    {crCurrentTarget || '...'}
+                  </div>
+                  <p className="text-gray-300 text-sm font-medium">Hit as many as you can with three darts.</p>
                 </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-4 text-center">
-                  {[
-                    { label: 'TOTAL ATTEMPTS', value: getCurrentStats().total, color: 'text-yellow-400' },
-                    { label: 'SUCCESS RATE', value: `${getCurrentStats().successRate}%`, color: goldGradient },
-                    { label: currentMode === 'double-out' ? 'GOT OUT' : 'GOT IN', value: getCurrentStats().successes, color: 'text-green-400' },
-                    { label: 'MISS', value: getCurrentStats().failures, color: 'text-red-400' }
-                  ].map(({ label, value, color }, index) => (
-                    <div key={index}>
-                      <div className={`text-2xl font-bold ${typeof color === 'string' ? color : ''}`} 
-                           style={typeof color === 'object' ? color : {}}>
-                        {value}
-                      </div>
-                      <div className="text-sm text-gray-300 font-medium">{label}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
-            {/* Recent History */}
-            {getCurrentAttempts().length > 0 && (
-              <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-                <h3 className="text-lg font-bold mb-3 text-pink-400">
-                  📝 RECENT {currentMode === 'cricket' ? 'THROWS' : currentMode === 'double-out' ? 'ATTEMPTS' : 'INS'}
-                </h3>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {getCurrentAttempts().slice(0, 10).map((attempt, index) => (
-                    <div key={index} className="flex justify-between items-center text-sm bg-gray-800 p-2 rounded">
-                      <span className="text-yellow-400 font-semibold">
-                        {currentMode === 'cricket' ? 
-                          attempt.number :
-                          currentMode === 'double-out' ? 
-                            `D${attempt.number}` : 
-                            (attempt.outcome === 'success' && attempt.score ? `Score: ${attempt.score}` : 'DOUBLE IN')
-                        }
-                      </span>
-                      <span className={`font-semibold ${currentMode === 'cricket' ? 'text-blue-400' : attempt.outcome === 'success' ? 'text-green-400' : 'text-red-400'}`}>
-                        {currentMode === 'cricket' ?
-                          (attempt.rounds === 0 ? '❌ MISS' : `✅ ${attempt.number === 'Bull' ? 'C' : 'R'}${attempt.rounds}`) :
-                          (attempt.outcome === 'success' ? 
-                            (currentMode === 'double-out' ? '✅' : '✅ GOT IN') : 
-                            (currentMode === 'double-out' ? '❌' : '❌ MISSED')
-                          )
-                        } {currentMode !== 'cricket' && attempt.outcome.toUpperCase()}
-                      </span>
-                      <span className="text-gray-400 text-xs">{attempt.timestamp}</span>
+                {crCurrentTarget === 'Bull' ? (
+                  <>
+                    <div className="grid grid-cols-3 gap-2 mb-2">
+                      <button onClick={() => recordCricket(0)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>MISS</button>
+                      {[1, 2].map(n => (
+                        <button key={n} onClick={() => recordCricket(n)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>C{n}</button>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
+                    <div className="grid grid-cols-4 gap-2 mb-6">
+                      {[3, 4, 5, 6].map(n => (
+                        <button key={n} onClick={() => recordCricket(n)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>C{n}</button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-5 gap-2 mb-2">
+                      <button onClick={() => recordCricket(0)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>MISS</button>
+                      {[1, 2, 3, 4].map(n => (
+                        <button key={n} onClick={() => recordCricket(n)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>R{n}</button>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-5 gap-2 mb-6">
+                      {[5, 6, 7, 8, 9].map(n => (
+                        <button key={n} onClick={() => recordCricket(n)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>R{n}</button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <button onClick={saveCricketSession} disabled={crAttempts.length === 0} className={`w-full ${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
+                  <div className="text-lg mr-2">💾</div>
+                  <div className="text-xs font-bold">SAVE SESSION</div>
+                </button>
+              </>
             )}
 
-            {/* Session History */}
-            {getCurrentSessionHistory().length > 0 && (
-              <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-                <h3 className="text-lg font-bold mb-3 text-pink-400">📈 PRACTICE SESSIONS</h3>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {getCurrentSessionHistory().map((session, index) => (
-                    <div key={session.id} className="flex justify-between items-center text-sm bg-gray-800 p-3 rounded">
-                      <div className="flex flex-col">
-                        <span className="text-yellow-400 font-semibold">
-                          Session #{getCurrentSessionHistory().length - index}
-                        </span>
-                        <span className="text-gray-400 text-xs">
-                          {new Date(session.endTime).toLocaleDateString()} • {session.duration}min
-                        </span>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-white font-bold">{session.totalAttempts} attempts</div>
-                        {currentMode === 'cricket' ? (
-                          <>
-                            <div className="text-sm text-blue-400 font-semibold">
-                              {session.avgRounds} avg rounds
-                            </div>
-                            <div className="text-xs text-green-400 font-medium">
-                              {session.totalRounds} total rounds
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className={`text-sm font-semibold ${session.successRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>
-                              {session.successRate}% success
-                            </div>
-                            {session.expectedValue && (
-                              <div className="text-xs text-blue-400 font-medium">
-                                Average in: {session.expectedValue}
+            {currentMode === 'history' && (
+              <>
+                <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
+                  <h3 className="text-lg font-bold mb-3 text-pink-400">📊 OVERALL STATS</h3>
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div><div className="text-2xl font-bold text-yellow-400">{sessions.length}</div><div className="text-sm text-gray-300 font-medium">TOTAL SESSIONS</div></div>
+                    <div><div className="text-2xl font-bold text-blue-400">{sessions.filter(s => s.mode === 'double-in').length}</div><div className="text-sm text-gray-300 font-medium">DOUBLE-IN</div></div>
+                    <div><div className="text-2xl font-bold text-green-400">{sessions.filter(s => s.mode === 'double-out').length}</div><div className="text-sm text-gray-300 font-medium">DOUBLE-OUT</div></div>
+                    <div><div className="text-2xl font-bold text-purple-400">{sessions.filter(s => s.mode === 'cricket').length}</div><div className="text-sm text-gray-300 font-medium">CRICKET</div></div>
+                  </div>
+                </div>
+
+                {sessions.length > 0 ? (
+                  <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
+                    <h3 className="text-lg font-bold mb-3 text-pink-400">📈 SESSION HISTORY</h3>
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {sessions.map((s, idx) => {
+                        const colors = {'double-in': 'bg-blue-600', 'double-out': 'bg-green-600', 'cricket': 'bg-purple-600'};
+                        const labels = {'double-in': 'DOUBLE-IN', 'double-out': 'DOUBLE-OUT', 'cricket': 'CRICKET'};
+                        return (
+                          <div key={s.id} className="bg-gray-800 p-3 rounded">
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className={`${colors[s.mode]} text-white text-xs font-bold px-2 py-1 rounded`}>{labels[s.mode]}</span>
+                                  <span className="text-yellow-400 font-semibold text-sm">Session #{sessions.length - idx}</span>
+                                </div>
+                                <span className="text-gray-400 text-xs">{new Date(s.endTime).toLocaleDateString()} • {s.duration}min</span>
                               </div>
-                            )}
-                          </>
-                        )}
-                      </div>
+                              <div className="text-right">
+                                <div className="text-white font-bold text-sm">{s.totalAttempts} attempts</div>
+                                {s.mode === 'cricket' ? (
+                                  <div className="text-sm text-blue-400 font-semibold">{s.avgRounds} avg rounds</div>
+                                ) : (
+                                  <>
+                                    <div className={`text-sm font-semibold ${s.successRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>{s.successRate}% success</div>
+                                    {s.expectedValue && <div className="text-xs text-blue-400 font-medium">Avg in: {s.expectedValue}</div>}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
+                    <p className="text-xs text-gray-500 mt-3">Your last 20 sessions are saved. Use the same device to practice.</p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-900 rounded-lg p-8 text-center mb-6 border border-gray-800">
+                    <p className="text-gray-400 text-sm">No sessions yet. Complete a training session to see it here!</p>
+                  </div>
+                )}
+
+                <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
+                  <div className="flex items-start mb-3">
+                    <input type="checkbox" id="confirmClear" checked={confirmClear} onChange={(e) => setConfirmClear(e.target.checked)} className="mt-1 mr-3 w-5 h-5 cursor-pointer" />
+                    <label htmlFor="confirmClear" className="text-sm text-gray-300 cursor-pointer">Delete all session history and start again.</label>
+                  </div>
+                  <button onClick={clearAllData} disabled={!confirmClear} className={`w-full font-black py-3 px-6 rounded-lg transition-all border-2 shadow-lg ${confirmClear ? 'bg-pink-600 hover:bg-pink-700 text-white border-pink-500 transform hover:scale-105 cursor-pointer' : 'bg-gray-700 text-gray-500 border-gray-600 cursor-not-allowed opacity-50'}`} style={confirmClear ? {textShadow: '2px 2px 4px rgba(0,0,0,0.8)'} : {}}>
+                    🧹 CLEAR ALL PRACTICE DATA
+                  </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-3">
-                  Your last five sessions are saved using browser memory. Use the same device to practice if you can.
-                </p>
+              </>
+            )}
+
+            {currentMode !== 'history' && (
+              <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
+                <h3 className="text-lg font-bold mb-3 text-pink-400">📊 STATS</h3>
+                {currentMode === 'cricket' ? (
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div><div className="text-2xl font-bold text-yellow-400">{getCurrentStats().total}</div><div className="text-sm text-gray-300 font-medium">TOTAL ATTEMPTS</div></div>
+                    <div><div className="text-2xl font-bold" style={goldGradient}>{getCurrentStats().avgRounds}</div><div className="text-sm text-gray-300 font-medium">AVG ROUNDS</div></div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div><div className="text-2xl font-bold text-yellow-400">{getCurrentStats().total}</div><div className="text-sm text-gray-300 font-medium">TOTAL ATTEMPTS</div></div>
+                    <div><div className="text-2xl font-bold" style={goldGradient}>{getCurrentStats().successRate}%</div><div className="text-sm text-gray-300 font-medium">SUCCESS RATE</div></div>
+                    <div><div className="text-2xl font-bold text-green-400">{getCurrentStats().successes}</div><div className="text-sm text-gray-300 font-medium">{currentMode === 'double-out' ? 'GOT OUT' : 'GOT IN'}</div></div>
+                    <div><div className="text-2xl font-bold text-red-400">{getCurrentStats().failures}</div><div className="text-sm text-gray-300 font-medium">MISS</div></div>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Save Status */}
+            {currentMode !== 'history' && getCurrentAttempts().length > 0 && (
+              <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
+                <h3 className="text-lg font-bold mb-3 text-pink-400">📝 RECENT {currentMode === 'cricket' ? 'THROWS' : currentMode === 'double-out' ? 'ATTEMPTS' : 'INS'}</h3>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {getCurrentAttempts().slice(0, 10).map((a, i) => (
+                    <div key={i} className="flex justify-between items-center text-sm bg-gray-800 p-2 rounded">
+                      <span className="text-yellow-400 font-semibold">
+                        {currentMode === 'cricket' ? a.number : currentMode === 'double-out' ? `D${a.number}` : (a.outcome === 'success' && a.score ? `Score: ${a.score}` : 'DOUBLE IN')}
+                      </span>
+                      <span className={`font-semibold ${currentMode === 'cricket' ? 'text-blue-400' : a.outcome === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+                        {currentMode === 'cricket' ? (a.rounds === 0 ? '❌ MISS' : `✅ ${a.number === 'Bull' ? 'C' : 'R'}${a.rounds}`) : (a.outcome === 'success' ? (currentMode === 'double-out' ? '✅' : '✅ GOT IN') : (currentMode === 'double-out' ? '❌' : '❌ MISSED'))} {currentMode !== 'cricket' && a.outcome.toUpperCase()}
+                      </span>
+                      <span className="text-gray-400 text-xs">{a.timestamp}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {saveStatus && (
               <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
                 <div className="text-xs text-center text-yellow-300 font-semibold">{saveStatus}</div>
               </div>
             )}
 
-            {/* Clear All Data Button */}
-            <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-              <div className="flex items-start mb-3">
-                <input
-                  type="checkbox"
-                  id="confirmClear"
-                  checked={confirmClear}
-                  onChange={(e) => setConfirmClear(e.target.checked)}
-                  className="mt-1 mr-3 w-5 h-5 cursor-pointer"
-                />
-                <label htmlFor="confirmClear" className="text-sm text-gray-300 cursor-pointer">
-                  Delete all session history and start again.
-                </label>
-              </div>
-              <button
-                onClick={clearAllData}
-                disabled={!confirmClear}
-                className={`w-full font-black py-3 px-6 rounded-lg transition-all border-2 shadow-lg ${
-                  confirmClear 
-                    ? 'bg-pink-600 hover:bg-pink-700 text-white border-pink-500 transform hover:scale-105 cursor-pointer' 
-                    : 'bg-gray-700 text-gray-500 border-gray-600 cursor-not-allowed opacity-50'
-                }`}
-                style={confirmClear ? {textShadow: '2px 2px 4px rgba(0,0,0,0.8)'} : {}}
-              >
-                🧹 CLEAR ALL PRACTICE DATA
-              </button>
-            </div>
-
-            {/* RTJ Emoji Sequence */}
             <div className="text-center mt-12 mb-12">
               <div className="text-4xl" style={{letterSpacing: '0.5em'}}>🤜👈</div>
             </div>
-
-            {/* Footer */}
             <div className="text-center text-yellow-400 text-xs font-semibold leading-tight">
               <p>All rights reserved</p>
               <p>Flatbush vs. Everybody</p>
