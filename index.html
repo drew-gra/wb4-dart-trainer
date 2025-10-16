@@ -89,6 +89,19 @@
       const PRIORITY_DOUBLES = [16, 20, 8, 12];
       const CRICKET_NUMBERS = [15, 16, 17, 18, 19, 20, 'Bull'];
 
+      // TRACKING HELPER - Added for Plausible analytics
+      const trackEvent = (eventName, props = {}) => {
+        if (window.plausible) {
+          window.plausible(eventName, { props });
+        }
+      };
+
+      // MODE CHANGE HANDLER - Track when users switch modes
+      const handleModeChange = (mode) => {
+        setCurrentMode(mode);
+        trackEvent('Mode Changed', { mode });
+      };
+
       const showStatus = (msg, timeout = 2000) => {
         setSaveStatus(msg);
         setTimeout(() => setSaveStatus(''), timeout);
@@ -137,6 +150,14 @@
         };
 
         setDoAttempts(prev => [attempt, ...prev]);
+        
+        // TRACK ATTEMPT - Added for analytics
+        trackEvent('Attempt Recorded', { 
+          mode: 'double-out', 
+          outcome,
+          target: doCurrentTarget 
+        });
+        
         setDoConsecutiveFails(outcome === 'success' ? 0 : doConsecutiveFails + 1);
         setDoCurrentTarget(generateDoubleOutTarget());
         showStatus('💾 Saved', 1000);
@@ -160,6 +181,14 @@
           failures: stats.failures
         });
 
+        // TRACK SESSION COMPLETION - Added for analytics
+        trackEvent('Training Session Completed', {
+          mode: 'double-out',
+          attempts: stats.total,
+          successRate: stats.successRate,
+          duration: duration
+        });
+
         setDoAttempts([]);
         setDoSessionStart(null);
         setDoConsecutiveFails(0);
@@ -177,6 +206,9 @@
           if (val >= 2 && val <= 170) {
             score = val;
             setDiScoreInput('');
+            
+            // TRACK SCORE ENTRY - Added for analytics
+            trackEvent('Score Entered', { score: val, mode: 'double-in' });
           } else {
             showStatus('⚠️ Score must be 2-170', 2000);
             return;
@@ -185,6 +217,10 @@
 
         const attempt = { outcome, score, timestamp: now.toLocaleTimeString() };
         setDiAttempts(prev => [attempt, ...prev]);
+        
+        // TRACK ATTEMPT - Added for analytics
+        trackEvent('Attempt Recorded', { mode: 'double-in', outcome });
+        
         showStatus('💾 Saved', 1000);
       };
 
@@ -208,6 +244,14 @@
           successes: stats.successes,
           failures: stats.failures,
           expectedValue: parseFloat(expectedValue)
+        });
+
+        // TRACK SESSION COMPLETION - Added for analytics
+        trackEvent('Training Session Completed', {
+          mode: 'double-in',
+          attempts: stats.total,
+          successRate: stats.successRate,
+          duration: duration
         });
 
         setDiAttempts([]);
@@ -237,6 +281,14 @@
         };
 
         setCrAttempts(prev => [attempt, ...prev]);
+        
+        // TRACK ATTEMPT - Added for analytics
+        trackEvent('Attempt Recorded', { 
+          mode: 'cricket', 
+          target: crCurrentTarget, 
+          rounds 
+        });
+        
         setCrCurrentTarget(generateCricketTarget());
         showStatus('💾 Saved', 1000);
       };
@@ -256,6 +308,14 @@
           totalAttempts: stats.total,
           totalRounds: stats.totalRounds,
           avgRounds: stats.avgRounds
+        });
+
+        // TRACK SESSION COMPLETION - Added for analytics
+        trackEvent('Training Session Completed', {
+          mode: 'cricket',
+          attempts: stats.total,
+          avgRounds: stats.avgRounds,
+          duration: duration
         });
 
         setCrAttempts([]);
@@ -321,7 +381,7 @@
                 {['double-in', 'double-out', 'cricket', 'history'].map(mode => (
                   <button
                     key={mode}
-                    onClick={() => setCurrentMode(mode)}
+                    onClick={() => handleModeChange(mode)}
                     className={`py-2 px-2 rounded-full text-xs font-bold transition-all duration-200 ${
                       currentMode === mode 
                         ? 'text-black border-2 border-yellow-400' 
