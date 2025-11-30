@@ -32,14 +32,11 @@
     const { useState, useEffect, useReducer, useCallback, useMemo } = React;
 
     // ============================================================================
-    // WB4 DART TRAINER - SCALABLE ARCHITECTURE
-    // Optimized for Claude-assisted development
-    // Each section is independently modifiable
+    // WB4 DART TRAINER - SCALABLE ARCHITECTURE (FIXED)
     // ============================================================================
 
     // ============================================================================
     // SECTION 1: CONFIGURATION & CONSTANTS
-    // Claude: Modify this section to add new modes or change settings
     // ============================================================================
     
     const CONFIG = {
@@ -59,7 +56,6 @@
 
     // ============================================================================
     // SECTION 2: SHARED SERVICES
-    // Claude: These are reusable utilities for all modes
     // ============================================================================
     
     const StorageService = {
@@ -148,15 +144,18 @@
 
     const Analytics = {
       track: (eventName, props = {}) => {
-        if (window.plausible) {
-          window.plausible(eventName, { props });
+        try {
+          if (window.plausible) {
+            window.plausible(eventName, { props });
+          }
+        } catch (e) {
+          console.error('Analytics error:', e);
         }
       }
     };
 
     // ============================================================================
     // SECTION 3: SHARED UI COMPONENTS
-    // Claude: Reusable UI components used across modes
     // ============================================================================
     
     const UI = {
@@ -217,12 +216,10 @@
 
     // ============================================================================
     // SECTION 4: MODE COMPONENTS
-    // Claude: Each mode is a self-contained component
-    // To add a new mode, create a new component here
     // ============================================================================
     
     // DOUBLE-IN MODE COMPONENT
-    const DoubleInMode = ({ sessionManager }) => {
+    const DoubleInMode = ({ sessionManager, onSessionComplete }) => {
       const [attempts, setAttempts] = useState([]);
       const [sessionStart, setSessionStart] = useState(null);
       const [scoreInput, setScoreInput] = useState('');
@@ -276,9 +273,14 @@
           duration: duration
         });
         
+        // Reset state after saving
         setAttempts([]);
         setSessionStart(null);
+        setScoreInput('');
         sessionManager.showStatus('📊 Session saved', 1500);
+        
+        // Call completion callback if provided
+        if (onSessionComplete) onSessionComplete();
       };
       
       const stats = StatsCalculator.doubleIn(attempts);
@@ -340,7 +342,7 @@
     };
 
     // DOUBLE-OUT MODE COMPONENT
-    const DoubleOutMode = ({ sessionManager }) => {
+    const DoubleOutMode = ({ sessionManager, onSessionComplete }) => {
       const [attempts, setAttempts] = useState([]);
       const [sessionStart, setSessionStart] = useState(null);
       const [currentTarget, setCurrentTarget] = useState(null);
@@ -369,8 +371,9 @@
           target: currentTarget 
         });
         
-        setConsecutiveFails(outcome === 'success' ? 0 : consecutiveFails + 1);
-        setCurrentTarget(TargetGenerator.doubleOut(outcome === 'success' ? 0 : consecutiveFails + 1));
+        const newFails = outcome === 'success' ? 0 : consecutiveFails + 1;
+        setConsecutiveFails(newFails);
+        setCurrentTarget(TargetGenerator.doubleOut(newFails));
         sessionManager.showStatus('💾 Saved', 1000);
       };
       
@@ -399,11 +402,15 @@
           duration: duration
         });
         
+        // Reset state after saving
         setAttempts([]);
         setSessionStart(null);
         setConsecutiveFails(0);
         setCurrentTarget(TargetGenerator.doubleOut(0));
         sessionManager.showStatus('📊 Session saved', 1500);
+        
+        // Call completion callback if provided
+        if (onSessionComplete) onSessionComplete();
       };
       
       const stats = StatsCalculator.basic(attempts);
@@ -461,7 +468,7 @@
     };
 
     // CRICKET MODE COMPONENT
-    const CricketMode = ({ sessionManager }) => {
+    const CricketMode = ({ sessionManager, onSessionComplete }) => {
       const [attempts, setAttempts] = useState([]);
       const [sessionStart, setSessionStart] = useState(null);
       const [currentTarget, setCurrentTarget] = useState(null);
@@ -517,10 +524,14 @@
           duration: duration
         });
         
+        // Reset state after saving
         setAttempts([]);
         setSessionStart(null);
         setCurrentTarget(TargetGenerator.cricket());
         sessionManager.showStatus('📊 Session saved', 1500);
+        
+        // Call completion callback if provided
+        if (onSessionComplete) onSessionComplete();
       };
       
       const stats = StatsCalculator.cricket(attempts);
@@ -679,8 +690,10 @@
             </div>
             <button 
               onClick={() => {
-                onClearData();
-                setConfirmClear(false);
+                if (confirmClear) {
+                  onClearData();
+                  setConfirmClear(false);
+                }
               }} 
               disabled={!confirmClear} 
               className={`w-full font-black py-3 px-6 rounded-lg transition-all border-2 shadow-lg ${
@@ -699,9 +712,6 @@
 
     // ============================================================================
     // SECTION 5: MODE REGISTRY
-    // Claude: Register all modes here. To add a new mode:
-    // 1. Create the component above
-    // 2. Add it to this registry
     // ============================================================================
     
     const MODE_REGISTRY = {
@@ -725,13 +735,13 @@
 
     // ============================================================================
     // SECTION 6: MAIN APP COMPONENT
-    // Claude: This orchestrates everything. Rarely needs changes.
     // ============================================================================
     
     const WB4DartTrainer = () => {
       const [currentMode, setCurrentMode] = useState(MODES.DOUBLE_IN);
       const [sessions, setSessions] = useState([]);
       const [saveStatus, setSaveStatus] = useState('');
+      const [refreshKey, setRefreshKey] = useState(0);
       
       // Load sessions on mount
       useEffect(() => {
@@ -740,11 +750,13 @@
       }, []);
       
       // Session Manager object for modes to use
-      const sessionManager = {
+      const sessionManager = useMemo(() => ({
         addSession: (sessionData) => {
-          const updated = [sessionData, ...sessions].slice(0, CONFIG.MAX_SESSIONS);
-          setSessions(updated);
-          StorageService.saveSessions(updated);
+          setSessions(prev => {
+            const updated = [sessionData, ...prev].slice(0, CONFIG.MAX_SESSIONS);
+            StorageService.saveSessions(updated);
+            return updated;
+          });
         },
         
         showStatus: (msg, timeout = 2000) => {
@@ -758,12 +770,17 @@
           setSaveStatus('🧹 All data cleared');
           Analytics.track('Data Cleared');
         }
-      };
+      }), []);
       
       const handleModeChange = (mode) => {
         setCurrentMode(mode);
         Analytics.track('Mode Changed', { mode });
       };
+      
+      const handleSessionComplete = useCallback(() => {
+        // Force re-render of components after save
+        setRefreshKey(prev => prev + 1);
+      }, []);
       
       // Get the current mode component
       const CurrentModeComponent = MODE_REGISTRY[currentMode]?.component;
@@ -803,9 +820,11 @@
             {/* Render Current Mode */}
             {CurrentModeComponent && (
               <CurrentModeComponent
+                key={refreshKey}
                 sessionManager={sessionManager}
                 sessions={sessions}
                 onClearData={sessionManager.clearAll}
+                onSessionComplete={handleSessionComplete}
               />
             )}
             
