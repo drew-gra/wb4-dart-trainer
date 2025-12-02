@@ -29,10 +29,10 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useReducer, useCallback, useMemo } = React;
+    const { useState, useEffect, useContext, useCallback, useMemo, createContext } = React;
 
     // ============================================================================
-    // WB4 DART TRAINER - SCALABLE ARCHITECTURE (FIXED)
+    // WB4 DART TRAINER - SCALABLE ARCHITECTURE WITH FIXES
     // ============================================================================
 
     // ============================================================================
@@ -55,7 +55,23 @@
     };
 
     // ============================================================================
-    // SECTION 2: SHARED SERVICES
+    // SECTION 2: REACT CONTEXT (FIX #1)
+    // ============================================================================
+    
+    // This replaces prop drilling. Modes can now useContext(SessionContext) 
+    // to access session management functions directly.
+    const SessionContext = createContext();
+
+    const useSession = () => {
+      const context = useContext(SessionContext);
+      if (!context) {
+        throw new Error('useSession must be used within SessionProvider');
+      }
+      return context;
+    };
+
+    // ============================================================================
+    // SECTION 3: SHARED SERVICES
     // ============================================================================
     
     const StorageService = {
@@ -155,7 +171,115 @@
     };
 
     // ============================================================================
-    // SECTION 3: SHARED UI COMPONENTS
+    // SECTION 4: CUSTOM HOOK - useTrainingSession (FIX #3)
+    // ============================================================================
+    
+    // This hook extracts the common pattern shared by all three training modes:
+    // - Initialize state (attempts, sessionStart, currentTarget/score)
+    // - Record an attempt
+    // - Save the session
+    // - Calculate stats
+    //
+    // Instead of duplicating this logic in 3 components, it's here once.
+    // When you add a new mode, you use this hook instead of writing 150 lines of boilerplate.
+
+    const useTrainingSession = ({ 
+      targetGenerator, 
+      statsCalculator, 
+      mode,
+      buildSessionData 
+    }) => {
+      const session = useSession(); // Get context
+      const [attempts, setAttempts] = useState([]);
+      const [sessionStart, setSessionStart] = useState(null);
+      const [currentTarget, setCurrentTarget] = useState(null);
+      const [consecutiveFails, setConsecutiveFails] = useState(0);
+      
+      // Initialize target on mount
+      useEffect(() => {
+        if (!currentTarget && targetGenerator) {
+          setCurrentTarget(targetGenerator(0));
+        }
+      }, []);
+      
+      const recordAttempt = useCallback((attemptData) => {
+        const now = new Date();
+        if (attempts.length === 0) setSessionStart(now);
+        
+        const attempt = { ...attemptData, timestamp: now.toLocaleTimeString() };
+        setAttempts(prev => [attempt, ...prev]);
+        
+        Analytics.track('Attempt Recorded', { 
+          mode,
+          ...attemptData
+        });
+        
+        // Update consecutive fails for modes that track it (double-out)
+        if (attemptData.outcome !== undefined) {
+          const newFails = attemptData.outcome === 'success' ? 0 : consecutiveFails + 1;
+          setConsecutiveFails(newFails);
+          
+          // Regenerate target if target generator uses consecutive fails
+          if (targetGenerator) {
+            setCurrentTarget(targetGenerator(newFails));
+          }
+        } else {
+          // For cricket mode, just generate next target
+          if (targetGenerator) {
+            setCurrentTarget(targetGenerator());
+          }
+        }
+        
+        session.showStatus('💾 Saved', 1000);
+      }, [attempts.length, consecutiveFails, targetGenerator, mode, session]);
+      
+      const saveSession = useCallback(() => {
+        if (attempts.length === 0) return;
+        
+        const stats = statsCalculator(attempts);
+        const duration = Math.round((new Date() - sessionStart) / 60000);
+        
+        const sessionData = buildSessionData({
+          stats,
+          duration,
+          startTime: sessionStart,
+          mode
+        });
+        
+        session.addSession(sessionData);
+        
+        Analytics.track('Training Session Completed', {
+          mode,
+          attempts: stats.total,
+          duration
+        });
+        
+        // Reset state
+        setAttempts([]);
+        setSessionStart(null);
+        setConsecutiveFails(0);
+        if (targetGenerator) {
+          setCurrentTarget(targetGenerator(0));
+        }
+        session.showStatus('📊 Session saved', 1500);
+      }, [attempts.length, sessionStart, statsCalculator, buildSessionData, targetGenerator, mode, session]);
+      
+      const stats = statsCalculator(attempts);
+      
+      return {
+        attempts,
+        currentTarget,
+        setCurrentTarget,
+        consecutiveFails,
+        recordAttempt,
+        saveSession,
+        stats,
+        sessionStart
+      };
+    };
+
+    // ============================================================================
+    // SECTION 5: SHARED UI COMPONENTS
     // ============================================================================
     
     const UI = {
@@ -215,19 +339,33 @@
     };
 
     // ============================================================================
-    // SECTION 4: MODE COMPONENTS
+    // SECTION 6: MODE COMPONENTS (USING FIX #3)
     // ============================================================================
     
-    // DOUBLE-IN MODE COMPONENT
-    const DoubleInMode = ({ sessionManager, onSessionComplete }) => {
-      const [attempts, setAttempts] = useState([]);
-      const [sessionStart, setSessionStart] = useState(null);
+    // DOUBLE-IN MODE
+    const DoubleInMode = () => {
+      const session = useSession();
       const [scoreInput, setScoreInput] = useState('');
       
-      const recordAttempt = (outcome) => {
-        const now = new Date();
-        if (attempts.length === 0) setSessionStart(now);
-        
+      const { attempts, recordAttempt, saveSession, stats } = useTrainingSession({
+        targetGenerator: null, // Double-in doesn't use target generator
+        statsCalculator: StatsCalculator.doubleIn,
+        mode: MODES.DOUBLE_IN,
+        buildSessionData: ({ stats, duration, startTime }) => ({
+          id: Date.now(),
+          mode: MODES.DOUBLE_IN,
+          startTime: startTime.toISOString(),
+          endTime: new Date().toISOString(),
+          duration,
+          totalAttempts: stats.total,
+          successRate: stats.successRate,
+          successes: stats.successes,
+          failures: stats.failures,
+          expectedValue: stats.expectedValue
+        })
+      });
+      
+      const handleRecordAttempt = (outcome) => {
         let score = null;
         if (outcome === 'success' && scoreInput) {
           const val = parseInt(scoreInput);
@@ -236,54 +374,13 @@
             setScoreInput('');
             Analytics.track('Score Entered', { score: val, mode: MODES.DOUBLE_IN });
           } else {
-            sessionManager.showStatus('⚠️ Score must be 2-170', 2000);
+            session.showStatus('⚠️ Score must be 2-170', 2000);
             return;
           }
         }
         
-        const attempt = { outcome, score, timestamp: now.toLocaleTimeString() };
-        setAttempts(prev => [attempt, ...prev]);
-        Analytics.track('Attempt Recorded', { mode: MODES.DOUBLE_IN, outcome });
-        sessionManager.showStatus('💾 Saved', 1000);
+        recordAttempt({ outcome, score });
       };
-      
-      const saveSession = () => {
-        if (attempts.length === 0) return;
-        
-        const stats = StatsCalculator.doubleIn(attempts);
-        const duration = Math.round((new Date() - sessionStart) / 60000);
-        
-        sessionManager.addSession({
-          id: Date.now(),
-          mode: MODES.DOUBLE_IN,
-          startTime: sessionStart.toISOString(),
-          endTime: new Date().toISOString(),
-          duration,
-          totalAttempts: stats.total,
-          successRate: stats.successRate,
-          successes: stats.successes,
-          failures: stats.failures,
-          expectedValue: stats.expectedValue
-        });
-        
-        Analytics.track('Training Session Completed', {
-          mode: MODES.DOUBLE_IN,
-          attempts: stats.total,
-          successRate: stats.successRate,
-          duration: duration
-        });
-        
-        // Reset state after saving
-        setAttempts([]);
-        setSessionStart(null);
-        setScoreInput('');
-        sessionManager.showStatus('📊 Session saved', 1500);
-        
-        // Call completion callback if provided
-        if (onSessionComplete) onSessionComplete();
-      };
-      
-      const stats = StatsCalculator.doubleIn(attempts);
       
       return (
         <>
@@ -303,11 +400,11 @@
           </div>
           
           <div className="grid grid-cols-3 gap-3 mb-6">
-            <UI.Button onClick={() => recordAttempt('success')}>
+            <UI.Button onClick={() => handleRecordAttempt('success')}>
               <div className="text-lg mb-1">✅</div>
               <div className="text-xs font-bold">GOT IN!</div>
             </UI.Button>
-            <UI.Button onClick={() => recordAttempt('fail')}>
+            <UI.Button onClick={() => handleRecordAttempt('fail')}>
               <div className="text-lg mb-1">❌</div>
               <div className="text-xs font-bold">MISSED</div>
             </UI.Button>
@@ -341,79 +438,24 @@
       );
     };
 
-    // DOUBLE-OUT MODE COMPONENT
-    const DoubleOutMode = ({ sessionManager, onSessionComplete }) => {
-      const [attempts, setAttempts] = useState([]);
-      const [sessionStart, setSessionStart] = useState(null);
-      const [currentTarget, setCurrentTarget] = useState(null);
-      const [consecutiveFails, setConsecutiveFails] = useState(0);
-      
-      useEffect(() => {
-        if (!currentTarget) {
-          setCurrentTarget(TargetGenerator.doubleOut(0));
-        }
-      }, []);
-      
-      const recordAttempt = (outcome) => {
-        const now = new Date();
-        if (attempts.length === 0) setSessionStart(now);
-        
-        const attempt = {
-          number: currentTarget,
-          outcome,
-          timestamp: now.toLocaleTimeString()
-        };
-        
-        setAttempts(prev => [attempt, ...prev]);
-        Analytics.track('Attempt Recorded', { 
-          mode: MODES.DOUBLE_OUT, 
-          outcome,
-          target: currentTarget 
-        });
-        
-        const newFails = outcome === 'success' ? 0 : consecutiveFails + 1;
-        setConsecutiveFails(newFails);
-        setCurrentTarget(TargetGenerator.doubleOut(newFails));
-        sessionManager.showStatus('💾 Saved', 1000);
-      };
-      
-      const saveSession = () => {
-        if (attempts.length === 0) return;
-        
-        const stats = StatsCalculator.basic(attempts);
-        const duration = Math.round((new Date() - sessionStart) / 60000);
-        
-        sessionManager.addSession({
+    // DOUBLE-OUT MODE
+    const DoubleOutMode = () => {
+      const { attempts, currentTarget, setCurrentTarget, consecutiveFails, recordAttempt, saveSession, stats } = useTrainingSession({
+        targetGenerator: TargetGenerator.doubleOut,
+        statsCalculator: StatsCalculator.basic,
+        mode: MODES.DOUBLE_OUT,
+        buildSessionData: ({ stats, duration, startTime }) => ({
           id: Date.now(),
           mode: MODES.DOUBLE_OUT,
-          startTime: sessionStart.toISOString(),
+          startTime: startTime.toISOString(),
           endTime: new Date().toISOString(),
           duration,
           totalAttempts: stats.total,
           successRate: stats.successRate,
           successes: stats.successes,
           failures: stats.failures
-        });
-        
-        Analytics.track('Training Session Completed', {
-          mode: MODES.DOUBLE_OUT,
-          attempts: stats.total,
-          successRate: stats.successRate,
-          duration: duration
-        });
-        
-        // Reset state after saving
-        setAttempts([]);
-        setSessionStart(null);
-        setConsecutiveFails(0);
-        setCurrentTarget(TargetGenerator.doubleOut(0));
-        sessionManager.showStatus('📊 Session saved', 1500);
-        
-        // Call completion callback if provided
-        if (onSessionComplete) onSessionComplete();
-      };
-      
-      const stats = StatsCalculator.basic(attempts);
+        })
+      });
       
       return (
         <>
@@ -427,11 +469,11 @@
           </div>
           
           <div className="grid grid-cols-4 gap-2 mb-6">
-            <UI.Button onClick={() => recordAttempt('success')} disabled={!currentTarget}>
+            <UI.Button onClick={() => recordAttempt({ outcome: 'success' })} disabled={!currentTarget}>
               <div className="text-lg mb-1">✅</div>
               <div className="text-xs font-bold">HIT IT!</div>
             </UI.Button>
-            <UI.Button onClick={() => recordAttempt('fail')} disabled={!currentTarget}>
+            <UI.Button onClick={() => recordAttempt({ outcome: 'fail' })} disabled={!currentTarget}>
               <div className="text-lg mb-1">❌</div>
               <div className="text-xs font-bold">MISSED</div>
             </UI.Button>
@@ -467,74 +509,23 @@
       );
     };
 
-    // CRICKET MODE COMPONENT
-    const CricketMode = ({ sessionManager, onSessionComplete }) => {
-      const [attempts, setAttempts] = useState([]);
-      const [sessionStart, setSessionStart] = useState(null);
-      const [currentTarget, setCurrentTarget] = useState(null);
-      
-      useEffect(() => {
-        if (!currentTarget) {
-          setCurrentTarget(TargetGenerator.cricket());
-        }
-      }, []);
-      
-      const recordAttempt = (rounds) => {
-        const now = new Date();
-        if (attempts.length === 0) setSessionStart(now);
-        
-        const attempt = {
-          number: currentTarget,
-          rounds,
-          timestamp: now.toLocaleTimeString()
-        };
-        
-        setAttempts(prev => [attempt, ...prev]);
-        Analytics.track('Attempt Recorded', { 
-          mode: MODES.CRICKET, 
-          target: currentTarget, 
-          rounds 
-        });
-        
-        setCurrentTarget(TargetGenerator.cricket());
-        sessionManager.showStatus('💾 Saved', 1000);
-      };
-      
-      const saveSession = () => {
-        if (attempts.length === 0) return;
-        
-        const stats = StatsCalculator.cricket(attempts);
-        const duration = Math.round((new Date() - sessionStart) / 60000);
-        
-        sessionManager.addSession({
+    // CRICKET MODE
+    const CricketMode = () => {
+      const { attempts, currentTarget, recordAttempt, saveSession, stats } = useTrainingSession({
+        targetGenerator: TargetGenerator.cricket,
+        statsCalculator: StatsCalculator.cricket,
+        mode: MODES.CRICKET,
+        buildSessionData: ({ stats, duration, startTime }) => ({
           id: Date.now(),
           mode: MODES.CRICKET,
-          startTime: sessionStart.toISOString(),
+          startTime: startTime.toISOString(),
           endTime: new Date().toISOString(),
           duration,
           totalAttempts: stats.total,
           totalRounds: stats.totalRounds,
           avgRounds: stats.avgRounds
-        });
-        
-        Analytics.track('Training Session Completed', {
-          mode: MODES.CRICKET,
-          attempts: stats.total,
-          avgRounds: stats.avgRounds,
-          duration: duration
-        });
-        
-        // Reset state after saving
-        setAttempts([]);
-        setSessionStart(null);
-        setCurrentTarget(TargetGenerator.cricket());
-        sessionManager.showStatus('📊 Session saved', 1500);
-        
-        // Call completion callback if provided
-        if (onSessionComplete) onSessionComplete();
-      };
-      
-      const stats = StatsCalculator.cricket(attempts);
+        })
+      });
       
       return (
         <>
@@ -550,42 +541,37 @@
           {currentTarget === 'Bull' ? (
             <>
               <div className="grid grid-cols-3 gap-2 mb-2">
-                <UI.Button onClick={() => recordAttempt(0)} className="text-xs py-3">MISS</UI.Button>
+                <UI.Button onClick={() => recordAttempt({ rounds: 0 })} className="text-xs py-3">MISS</UI.Button>
                 {[1, 2].map(n => (
-                  <UI.Button key={n} onClick={() => recordAttempt(n)} className="text-xs py-3">C{n}</UI.Button>
+                  <UI.Button key={n} onClick={() => recordAttempt({ rounds: n })} className="text-xs py-3">C{n}</UI.Button>
                 ))}
               </div>
               <div className="grid grid-cols-4 gap-2 mb-6">
                 {[3, 4, 5, 6].map(n => (
-                  <UI.Button key={n} onClick={() => recordAttempt(n)} className="text-xs py-3">C{n}</UI.Button>
+                  <UI.Button key={n} onClick={() => recordAttempt({ rounds: n })} className="text-xs py-3">C{n}</UI.Button>
                 ))}
               </div>
             </>
           ) : (
             <>
               <div className="grid grid-cols-5 gap-2 mb-2">
-                <UI.Button onClick={() => recordAttempt(0)} className="text-xs py-3">MISS</UI.Button>
+                <UI.Button onClick={() => recordAttempt({ rounds: 0 })} className="text-xs py-3">MISS</UI.Button>
                 {[1, 2, 3, 4].map(n => (
-                  <UI.Button key={n} onClick={() => recordAttempt(n)} className="text-xs py-3">R{n}</UI.Button>
+                  <UI.Button key={n} onClick={() => recordAttempt({ rounds: n })} className="text-xs py-3">R{n}</UI.Button>
                 ))}
               </div>
               <div className="grid grid-cols-5 gap-2 mb-6">
                 {[5, 6, 7, 8, 9].map(n => (
-                  <UI.Button key={n} onClick={() => recordAttempt(n)} className="text-xs py-3">R{n}</UI.Button>
+                  <UI.Button key={n} onClick={() => recordAttempt({ rounds: n })} className="text-xs py-3">R{n}</UI.Button>
                 ))}
               </div>
             </>
           )}
           
-          <button 
-            onClick={saveSession} 
-            disabled={attempts.length === 0} 
-            className={`w-full ${UI.btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex items-center justify-center`} 
-            style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}
-          >
+          <UI.Button onClick={saveSession} disabled={attempts.length === 0} className="w-full">
             <div className="text-lg mr-2">💾</div>
             <div className="text-xs font-bold">SAVE SESSION</div>
-          </button>
+          </UI.Button>
           
           <UI.StatsDisplay stats={stats} mode={MODES.CRICKET} />
           
@@ -609,8 +595,9 @@
       );
     };
 
-    // HISTORY MODE COMPONENT
-    const HistoryMode = ({ sessions, onClearData }) => {
+    // HISTORY MODE (Doesn't use useTrainingSession hook - different pattern)
+    const HistoryMode = ({ sessions }) => {
+      const session = useSession();
       const [confirmClear, setConfirmClear] = useState(false);
       
       return (
@@ -688,30 +675,25 @@
                 Delete all session history and start again.
               </label>
             </div>
-            <button 
+            <UI.Button 
               onClick={() => {
                 if (confirmClear) {
-                  onClearData();
+                  session.clearAll();
                   setConfirmClear(false);
                 }
               }} 
-              disabled={!confirmClear} 
-              className={`w-full font-black py-3 px-6 rounded-lg transition-all border-2 shadow-lg ${
-                confirmClear 
-                  ? 'bg-pink-600 hover:bg-pink-700 text-white border-pink-500 transform hover:scale-105 cursor-pointer' 
-                  : 'bg-gray-700 text-gray-500 border-gray-600 cursor-not-allowed opacity-50'
-              }`}
-              style={confirmClear ? {textShadow: '2px 2px 4px rgba(0,0,0,0.8)'} : {}}
+              disabled={!confirmClear}
+              className="w-full bg-pink-600 hover:bg-pink-700 text-white"
             >
               🧹 CLEAR ALL PRACTICE DATA
-            </button>
+            </UI.Button>
           </div>
         </>
       );
     };
 
     // ============================================================================
-    // SECTION 5: MODE REGISTRY
+    // SECTION 7: MODE REGISTRY
     // ============================================================================
     
     const MODE_REGISTRY = {
@@ -734,7 +716,7 @@
     };
 
     // ============================================================================
-    // SECTION 6: MAIN APP COMPONENT
+    // SECTION 8: MAIN APP COMPONENT
     // ============================================================================
     
     const WB4DartTrainer = () => {
@@ -749,8 +731,8 @@
         setSessions(loaded);
       }, []);
       
-      // Session Manager object for modes to use
-      const sessionManager = useMemo(() => ({
+      // Session context value - this is what modes access via useSession()
+      const sessionContextValue = useMemo(() => ({
         addSession: (sessionData) => {
           setSessions(prev => {
             const updated = [sessionData, ...prev].slice(0, CONFIG.MAX_SESSIONS);
@@ -777,79 +759,73 @@
         Analytics.track('Mode Changed', { mode });
       };
       
-      const handleSessionComplete = useCallback(() => {
-        // Force re-render of components after save
-        setRefreshKey(prev => prev + 1);
-      }, []);
-      
       // Get the current mode component
       const CurrentModeComponent = MODE_REGISTRY[currentMode]?.component;
       
       return (
-        <div className="min-h-screen bg-black text-white p-4" style={{background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)'}}>
-          <div className="max-w-md mx-auto">
-            
-            {/* Header */}
-            <div className="text-center mb-6">
-              <h1 className="text-3xl font-bold mb-2" style={UI.goldGradient}>WB4 DART TRAINER</h1>
-            </div>
-            
-            {/* Mode Navigation */}
-            <div className="bg-gray-900 rounded-full p-2 mb-6 border border-gray-800">
-              <div className="grid grid-cols-4 gap-1">
-                {Object.entries(MODE_REGISTRY).map(([mode, config]) => (
-                  <button
-                    key={mode}
-                    onClick={() => handleModeChange(mode)}
-                    className={`py-2 px-2 rounded-full text-xs font-bold transition-all duration-200 ${
-                      currentMode === mode 
-                        ? 'text-black border-2 border-yellow-400' 
-                        : 'text-gray-300 border-2 border-gray-600 hover:border-gray-500'
-                    }`}
-                    style={currentMode === mode ? 
-                      {background: 'linear-gradient(45deg, #ffd700, #ffed4a)', textShadow: '1px 1px 2px rgba(0,0,0,0.3)'} :
-                      {background: 'linear-gradient(145deg, #374151, #1f2937)'}
-                    }
-                  >
-                    {config.label}
-                  </button>
-                ))}
+        <SessionContext.Provider value={sessionContextValue}>
+          <div className="min-h-screen bg-black text-white p-4" style={{background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)'}}>
+            <div className="max-w-md mx-auto">
+              
+              {/* Header */}
+              <div className="text-center mb-6">
+                <h1 className="text-3xl font-bold mb-2" style={UI.goldGradient}>WB4 DART TRAINER</h1>
               </div>
-            </div>
-            
-            {/* Render Current Mode */}
-            {CurrentModeComponent && (
-              <CurrentModeComponent
-                key={refreshKey}
-                sessionManager={sessionManager}
-                sessions={sessions}
-                onClearData={sessionManager.clearAll}
-                onSessionComplete={handleSessionComplete}
-              />
-            )}
-            
-            {/* Status Messages */}
-            {saveStatus && (
-              <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-                <div className="text-xs text-center text-yellow-300 font-semibold">{saveStatus}</div>
+              
+              {/* Mode Navigation */}
+              <div className="bg-gray-900 rounded-full p-2 mb-6 border border-gray-800">
+                <div className="grid grid-cols-4 gap-1">
+                  {Object.entries(MODE_REGISTRY).map(([mode, config]) => (
+                    <button
+                      key={mode}
+                      onClick={() => handleModeChange(mode)}
+                      className={`py-2 px-2 rounded-full text-xs font-bold transition-all duration-200 ${
+                        currentMode === mode 
+                          ? 'text-black border-2 border-yellow-400' 
+                          : 'text-gray-300 border-2 border-gray-600 hover:border-gray-500'
+                      }`}
+                      style={currentMode === mode ? 
+                        {background: 'linear-gradient(45deg, #ffd700, #ffed4a)', textShadow: '1px 1px 2px rgba(0,0,0,0.3)'} :
+                        {background: 'linear-gradient(145deg, #374151, #1f2937)'}
+                      }
+                    >
+                      {config.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            )}
-            
-            {/* Footer */}
-            <div className="text-center mt-12 mb-12">
-              <div className="text-4xl" style={{letterSpacing: '0.5em'}}>🤜👈</div>
-            </div>
-            <div className="text-center text-yellow-400 text-xs font-semibold leading-tight">
-              <p>All rights reserved</p>
-              <p>Flatbush vs. Everybody</p>
+              
+              {/* Render Current Mode */}
+              {CurrentModeComponent && (
+                <CurrentModeComponent
+                  key={refreshKey}
+                  sessions={sessions}
+                />
+              )}
+              
+              {/* Status Messages */}
+              {saveStatus && (
+                <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
+                  <div className="text-xs text-center text-yellow-300 font-semibold">{saveStatus}</div>
+                </div>
+              )}
+              
+              {/* Footer */}
+              <div className="text-center mt-12 mb-12">
+                <div className="text-4xl" style={{letterSpacing: '0.5em'}}>🤜👈</div>
+              </div>
+              <div className="text-center text-yellow-400 text-xs font-semibold leading-tight">
+                <p>All rights reserved</p>
+                <p>Flatbush vs. Everybody</p>
+              </div>
             </div>
           </div>
-        </div>
+        </SessionContext.Provider>
       );
     };
     
     // ============================================================================
-    // SECTION 7: APP INITIALIZATION
+    // SECTION 9: APP INITIALIZATION
     // ============================================================================
     
     ReactDOM.render(<WB4DartTrainer />, document.getElementById('root'));
