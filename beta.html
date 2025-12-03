@@ -73,6 +73,7 @@
       const [confirmClear, setConfirmClear] = useState(false);
       const { sessions, addSession, clearSessions } = useSessionManager();
       const contentRef = useRef(null);
+      const isInitialMount = useRef(true);
 
       const [diAttempts, setDiAttempts] = useState([]);
       const [diSessionStart, setDiSessionStart] = useState(null);
@@ -119,8 +120,13 @@
         trackEvent('Mode Changed', { mode });
       };
 
-      // Scroll to content when mode changes
+      // Scroll to content when mode changes (but not on initial load)
       useEffect(() => {
+        if (isInitialMount.current) {
+          isInitialMount.current = false;
+          return;
+        }
+        
         if (contentRef.current) {
           contentRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
