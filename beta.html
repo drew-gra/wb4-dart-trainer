@@ -960,7 +960,12 @@
 
                 {/* Back button */}
                 <button
-                  onClick={() => handleModeChange('double-in')}
+                  onClick={() => {
+                    handleModeChange('double-in');
+                    setTimeout(() => {
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }, 50);
+                  }}
                   className="w-full py-3 px-6 rounded-lg font-bold text-sm transition-all transform hover:scale-105 shadow-lg bg-gray-800 text-gray-300 border border-gray-700 hover:border-gray-600 mb-8"
                 >
                   ← BACK TO TRAINING
