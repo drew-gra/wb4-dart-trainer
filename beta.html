@@ -52,7 +52,7 @@
 
       const addSession = (sessionData) => {
         setSessions(prev => {
-          const updated = [sessionData, ...prev].slice(0, 20);
+          const updated = [sessionData, ...prev].slice(0, 100);
           localStorage.setItem('wb4UnifiedSessionHistory', JSON.stringify(updated));
           return updated;
         });
@@ -120,10 +120,15 @@
         trackEvent('Mode Changed', { mode });
       };
 
-      // Scroll to content when mode changes (but not on initial load)
+      // Scroll to content when mode changes (but not on initial load or when going to History)
       useEffect(() => {
         if (isInitialMount.current) {
           isInitialMount.current = false;
+          return;
+        }
+        
+        // Don't auto-scroll for History mode
+        if (currentMode === 'history') {
           return;
         }
         
@@ -925,7 +930,7 @@
                         );
                       })}
                     </div>
-                    <p className="text-xs text-gray-500 mt-3">Your last 20 sessions are saved. Use the same device to practice.</p>
+                    <p className="text-xs text-gray-500 mt-3">Your last 100 sessions are saved. Use the same device to practice.</p>
                   </div>
                 ) : (
                   <div className="bg-gray-900 rounded-lg p-8 text-center mb-8 border border-gray-800">
