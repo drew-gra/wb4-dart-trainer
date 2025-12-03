@@ -89,6 +89,7 @@
       // Cricket mode state
       const [ckHits, setCkHits] = useState({ 20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, Bull: 0 });
       const [ckTotalThrows, setCkTotalThrows] = useState(0);
+      const [ckMissCount, setCkMissCount] = useState(0);
       const [ckGameStart, setCkGameStart] = useState(null);
       const [ckCompletedGames, setCkCompletedGames] = useState([]);
       const [ckPendingSelections, setCkPendingSelections] = useState([]);
@@ -96,6 +97,15 @@
       const PRIORITY_DOUBLES = [16, 20, 8, 12];
       const TRIPLES_NUMBERS = [15, 16, 17, 18, 19, 20, 'Bull'];
       const CRICKET_WEIGHTS = { 15: 1, 16: 1, 17: 1, 18: 1, 19: 1, 20: 1, 'Bull': 0.2 };
+
+      // MODES CONFIGURATION - Centralized for easy scaling
+      const MODES = [
+        { id: 'double-in', label: 'DOUBLE-IN' },
+        { id: 'double-out', label: 'DOUBLE-OUT' },
+        { id: 'triples', label: 'TRIPLES' },
+        { id: 'cricket', label: 'CRICKET' },
+        { id: 'history', label: 'HISTORY' }
+      ];
 
       // TRACKING HELPER
       const trackEvent = (eventName, props = {}) => {
@@ -341,6 +351,8 @@
           setCkCompletedGames(newGames);
           
           const duration = Math.round((now - ckGameStart) / 60000) || 1;
+          const missRate = ckTotalThrows > 0 ? Math.round((ckMissCount / ckTotalThrows) * 100) : 0;
+          
           addSession({
             id: Date.now(),
             mode: 'cricket',
@@ -348,7 +360,7 @@
             endTime: now.toISOString(),
             duration,
             throws: ckTotalThrows,
-            missRate: Math.round(((ckTotalThrows - 21) / ckTotalThrows) * 100)
+            missRate: missRate
           });
           
           showStatus('🎯 Game Complete! Starting new game...', 2000);
@@ -356,6 +368,7 @@
           setTimeout(() => {
             setCkHits({ 20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, Bull: 0 });
             setCkTotalThrows(0);
+            setCkMissCount(0);
             setCkGameStart(null);
             setCkPendingSelections([]);
           }, 2000);
@@ -381,6 +394,8 @@
         if (!ckGameStart) setCkGameStart(new Date());
         
         const newHits = { ...ckHits };
+        const missCount = ckPendingSelections.filter(s => s.type === 'miss').length;
+        
         ckPendingSelections.forEach(selection => {
           if (selection.type === 'hit') {
             newHits[selection.number] = Math.min(3, newHits[selection.number] + selection.count);
@@ -389,6 +404,7 @@
         
         setCkHits(newHits);
         setCkTotalThrows(prev => prev + ckPendingSelections.length);
+        setCkMissCount(prev => prev + missCount);
         setCkPendingSelections([]);
         showStatus('✓ Saved', 800);
       };
@@ -400,6 +416,7 @@
       const handleCricketNewGame = () => {
         setCkHits({ 20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, Bull: 0 });
         setCkTotalThrows(0);
+        setCkMissCount(0);
         setCkGameStart(null);
         setCkPendingSelections([]);
         showStatus('🎯 New game started', 1000);
@@ -434,6 +451,7 @@
         setTpSessionStart(null);
         setCkHits({ 20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, Bull: 0 });
         setCkTotalThrows(0);
+        setCkMissCount(0);
         setCkGameStart(null);
         setCkCompletedGames([]);
         setCkPendingSelections([]);
@@ -474,46 +492,28 @@
             </div>
 
             <div className="bg-gray-900 rounded-lg p-2 mb-6 border border-gray-800">
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                {['double-in', 'double-out'].map(mode => (
-                  <button
-                    key={mode}
-                    onClick={() => handleModeChange(mode)}
-                    className={`py-3 px-2 rounded-lg text-xs font-bold transition-all duration-200 ${
-                      currentMode === mode 
-                        ? 'text-black border-2 border-yellow-400' 
-                        : 'text-gray-300 border-2 border-gray-600 hover:border-gray-500'
-                    }`}
-                    style={currentMode === mode ? 
-                      {background: 'linear-gradient(45deg, #ffd700, #ffed4a)', textShadow: '1px 1px 2px rgba(0,0,0,0.3)'} :
-                      {background: 'linear-gradient(145deg, #374151, #1f2937)'}
-                    }
-                  >
-                    {mode === 'double-in' && 'DOUBLE-IN'}
-                    {mode === 'double-out' && 'DOUBLE-OUT'}
-                  </button>
-                ))}
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {['triples', 'cricket', 'history'].map(mode => (
-                  <button
-                    key={mode}
-                    onClick={() => handleModeChange(mode)}
-                    className={`py-3 px-2 rounded-lg text-xs font-bold transition-all duration-200 ${
-                      currentMode === mode 
-                        ? 'text-black border-2 border-yellow-400' 
-                        : 'text-gray-300 border-2 border-gray-600 hover:border-gray-500'
-                    }`}
-                    style={currentMode === mode ? 
-                      {background: 'linear-gradient(45deg, #ffd700, #ffed4a)', textShadow: '1px 1px 2px rgba(0,0,0,0.3)'} :
-                      {background: 'linear-gradient(145deg, #374151, #1f2937)'}
-                    }
-                  >
-                    {mode === 'triples' && 'TRIPLES'}
-                    {mode === 'cricket' && 'CRICKET'}
-                    {mode === 'history' && 'HISTORY'}
-                  </button>
-                ))}
+              <div className="grid gap-2" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))'}}>
+                {MODES.map((mode, idx, arr) => {
+                  const isLastAndOdd = idx === arr.length - 1 && arr.length % 2 === 1;
+                  
+                  return (
+                    <button
+                      key={mode.id}
+                      onClick={() => handleModeChange(mode.id)}
+                      className={`py-3 px-2 rounded-lg text-xs font-bold transition-all duration-200 ${
+                        currentMode === mode.id 
+                          ? 'text-black border-2 border-yellow-400' 
+                          : 'text-gray-300 border-2 border-gray-600 hover:border-gray-500'
+                      } ${isLastAndOdd ? 'col-span-full w-fit mx-auto' : ''}`}
+                      style={currentMode === mode.id ? 
+                        {background: 'linear-gradient(45deg, #ffd700, #ffed4a)', textShadow: '1px 1px 2px rgba(0,0,0,0.3)'} :
+                        {background: 'linear-gradient(145deg, #374151, #1f2937)'}
+                      }
+                    >
+                      {mode.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -662,9 +662,9 @@
                     }`}
                   >
                     ✓ SUBMIT
-                    {ckPendingSelections.length > 0 && (
-                      <div className="text-xs font-normal mt-0.5">({ckPendingSelections.length})</div>
-                    )}
+                    <div className={`text-xs font-normal mt-0.5 ${ckPendingSelections.length === 0 ? 'invisible' : ''}`}>
+                      ({ckPendingSelections.length})
+                    </div>
                   </button>
                   <button
                     onClick={handleCricketClear}
@@ -876,33 +876,31 @@
                           'cricket': 'CRICKET'
                         };
                         
+                        const endDateTime = new Date(s.endTime);
+                        const dateStr = endDateTime.toLocaleDateString();
+                        const timeStr = endDateTime.toLocaleTimeString();
+                        
                         return (
                           <div key={s.id} className="bg-gray-800 p-3 rounded">
                             <div className="flex justify-between items-start mb-2">
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className={`${colors[s.mode]} text-white text-xs font-bold px-2 py-1 rounded`}>{labels[s.mode]}</span>
-                                  <span className="text-yellow-400 font-semibold text-sm">Session #{sessions.length - idx}</span>
                                 </div>
-                                <span className="text-gray-400 text-xs">{new Date(s.endTime).toLocaleDateString()} • {s.duration}min</span>
+                                <span className="text-gray-400 text-xs">{dateStr} • {timeStr} • {s.duration}min</span>
                               </div>
                               <div className="text-right">
                                 {s.mode === 'cricket' ? (
-                                  <>
-                                    <div className="text-white font-bold text-sm">Speed: {s.throws}</div>
-                                    <div className="text-sm text-blue-400 font-semibold">{s.missRate || (100 - (s.efficiency || 0))}% miss</div>
-                                  </>
+                                  <div className="text-white text-sm font-semibold">Closing Speed {s.throws} {s.missRate || 0}% miss rate</div>
                                 ) : s.mode === 'triples' ? (
-                                  <>
-                                    <div className="text-white font-bold text-sm">{s.totalAttempts} attempts</div>
-                                    <div className="text-sm text-blue-400 font-semibold">{s.avgRounds} avg rounds</div>
-                                  </>
+                                  <div className="text-white text-sm font-semibold">{s.avgRounds} MPR {s.totalAttempts} attempts</div>
+                                ) : s.mode === 'double-out' ? (
+                                  <div className="text-white text-sm font-semibold">{s.successRate}% check-out rate {s.totalAttempts} attempts</div>
                                 ) : (
-                                  <>
-                                    <div className="text-white font-bold text-sm">{s.totalAttempts} attempts</div>
-                                    <div className={`text-sm font-semibold ${s.successRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>{s.successRate}% success</div>
-                                    {s.expectedValue && <div className="text-xs text-blue-400 font-medium">Avg in: {s.expectedValue}</div>}
-                                  </>
+                                  <div className="text-white text-sm font-semibold">
+                                    <div>{s.successRate}% double-in rate {s.totalAttempts} attempts</div>
+                                    {s.expectedValue && <div>average double-in {s.expectedValue}</div>}
+                                  </div>
                                 )}
                               </div>
                             </div>
