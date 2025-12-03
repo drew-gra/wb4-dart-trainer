@@ -872,11 +872,10 @@
                 <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
                   <h3 className="text-lg font-bold mb-3 text-pink-400">📊 OVERALL STATS</h3>
                   <div className="grid grid-cols-2 gap-4 text-center">
-                    <div><div className="text-2xl font-bold text-yellow-400">{sessions.length}</div><div className="text-sm text-gray-300 font-medium">TOTAL SESSIONS</div></div>
                     <div><div className="text-2xl font-bold text-blue-400">{sessions.filter(s => s.mode === 'double-in').length}</div><div className="text-sm text-gray-300 font-medium">DOUBLE-IN</div></div>
                     <div><div className="text-2xl font-bold text-green-400">{sessions.filter(s => s.mode === 'double-out').length}</div><div className="text-sm text-gray-300 font-medium">DOUBLE-OUT</div></div>
                     <div><div className="text-2xl font-bold text-purple-400">{sessions.filter(s => s.mode === 'triples').length}</div><div className="text-sm text-gray-300 font-medium">TRIPLES</div></div>
-                    <div className="col-span-2"><div className="text-2xl font-bold text-pink-400">{sessions.filter(s => s.mode === 'cricket').length}</div><div className="text-sm text-gray-300 font-medium">CRICKET</div></div>
+                    <div><div className="text-2xl font-bold text-pink-400">{sessions.filter(s => s.mode === 'cricket').length}</div><div className="text-sm text-gray-300 font-medium">CRICKET</div></div>
                   </div>
                 </div>
 
@@ -904,25 +903,36 @@
                         
                         return (
                           <div key={s.id} className="bg-gray-800 p-3 rounded">
-                            <div className="flex justify-between items-start mb-2">
+                            <div className="flex justify-between items-start">
+                              {/* Left side - 3 rows */}
                               <div className="flex flex-col">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className={`${colors[s.mode]} text-white text-xs font-bold px-2 py-1 rounded`}>{labels[s.mode]}</span>
-                                </div>
-                                <span className="text-gray-400 text-xs">{dateStr} • {timeStr} • {s.duration}min</span>
+                                <span className={`${colors[s.mode]} text-white text-xs font-bold px-2 py-1 rounded mb-1 w-fit`}>{labels[s.mode]}</span>
+                                <span className="text-gray-400 text-xs">{dateStr}</span>
+                                <span className="text-gray-400 text-xs">{timeStr}</span>
                               </div>
+                              {/* Right side - 2 or 3 rows */}
                               <div className="text-right">
                                 {s.mode === 'cricket' ? (
-                                  <div className="text-white text-sm font-semibold">Closing Speed {s.throws} {s.missRate || 0}% miss rate</div>
+                                  <>
+                                    <div className="text-white text-sm font-semibold">Closing Speed: {s.throws} darts</div>
+                                    <div className="text-gray-400 text-xs">{s.missRate || 0}% miss rate</div>
+                                  </>
                                 ) : s.mode === 'triples' ? (
-                                  <div className="text-white text-sm font-semibold">{s.avgRounds} MPR {s.totalAttempts} attempts</div>
+                                  <>
+                                    <div className="text-white text-sm font-semibold">{s.avgRounds} MPR</div>
+                                    <div className="text-gray-400 text-xs">{s.totalAttempts} attempts</div>
+                                  </>
                                 ) : s.mode === 'double-out' ? (
-                                  <div className="text-white text-sm font-semibold">{s.successRate}% check-out rate {s.totalAttempts} attempts</div>
+                                  <>
+                                    <div className="text-white text-sm font-semibold">{s.successRate}% check-out rate</div>
+                                    <div className="text-gray-400 text-xs">{s.totalAttempts} attempts</div>
+                                  </>
                                 ) : (
-                                  <div className="text-white text-sm font-semibold">
-                                    <div>{s.successRate}% double-in rate {s.totalAttempts} attempts</div>
-                                    {s.expectedValue && <div>average double-in {s.expectedValue}</div>}
-                                  </div>
+                                  <>
+                                    <div className="text-white text-sm font-semibold">{s.successRate}% double-in rate</div>
+                                    <div className="text-gray-400 text-xs">{s.totalAttempts} attempts</div>
+                                    <div className="text-gray-400 text-xs">avg score: {s.expectedValue}</div>
+                                  </>
                                 )}
                               </div>
                             </div>
