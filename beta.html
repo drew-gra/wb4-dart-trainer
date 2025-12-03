@@ -348,7 +348,7 @@
             endTime: now.toISOString(),
             duration,
             throws: ckTotalThrows,
-            efficiency: Math.round((21 / ckTotalThrows) * 100)
+            missRate: Math.round(((ckTotalThrows - 21) / ckTotalThrows) * 100)
           });
           
           showStatus('🎯 Game Complete! Starting new game...', 2000);
@@ -890,7 +890,7 @@
                                 {s.mode === 'cricket' ? (
                                   <>
                                     <div className="text-white font-bold text-sm">Speed: {s.throws}</div>
-                                    <div className="text-sm text-blue-400 font-semibold">{s.efficiency}% efficiency</div>
+                                    <div className="text-sm text-blue-400 font-semibold">{s.missRate || (100 - (s.efficiency || 0))}% miss</div>
                                   </>
                                 ) : s.mode === 'triples' ? (
                                   <>
