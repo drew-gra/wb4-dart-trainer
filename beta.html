@@ -98,13 +98,12 @@
       const TRIPLES_NUMBERS = [15, 16, 17, 18, 19, 20, 'Bull'];
       const CRICKET_WEIGHTS = { 15: 1, 16: 1, 17: 1, 18: 1, 19: 1, 20: 1, 'Bull': 0.2 };
 
-      // MODES CONFIGURATION - Centralized for easy scaling
-      const MODES = [
+      // MODES CONFIGURATION - Only training modes, History moved to bottom
+      const TRAINING_MODES = [
         { id: 'double-in', label: 'DOUBLE-IN' },
         { id: 'double-out', label: 'DOUBLE-OUT' },
         { id: 'triples', label: 'TRIPLES' },
-        { id: 'cricket', label: 'CRICKET' },
-        { id: 'history', label: 'HISTORY' }
+        { id: 'cricket', label: 'CRICKET' }
       ];
 
       // TRACKING HELPER
@@ -487,54 +486,57 @@
         <div className="min-h-screen bg-black text-white p-4" style={{background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)'}}>
           <div className="max-w-md mx-auto">
             
-            <div className="text-center mb-6">
+            {/* HEADER */}
+            <div className="text-center mb-8">
               <h1 className="text-3xl font-bold mb-2" style={goldGradient}>WB4 DART TRAINER</h1>
             </div>
 
-            <div className="bg-gray-900 rounded-lg p-2 mb-6 border border-gray-800">
-              <div className="grid gap-2" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))'}}>
-                {MODES.map((mode, idx, arr) => {
-                  const isLastAndOdd = idx === arr.length - 1 && arr.length % 2 === 1;
-                  
-                  return (
-                    <button
-                      key={mode.id}
-                      onClick={() => handleModeChange(mode.id)}
-                      className={`py-3 px-2 rounded-lg text-xs font-bold transition-all duration-200 ${
-                        currentMode === mode.id 
-                          ? 'text-black border-2 border-yellow-400' 
-                          : 'text-gray-300 border-2 border-gray-600 hover:border-gray-500'
-                      } ${isLastAndOdd ? 'col-span-full w-fit mx-auto' : ''}`}
-                      style={currentMode === mode.id ? 
-                        {background: 'linear-gradient(45deg, #ffd700, #ffed4a)', textShadow: '1px 1px 2px rgba(0,0,0,0.3)'} :
-                        {background: 'linear-gradient(145deg, #374151, #1f2937)'}
-                      }
-                    >
-                      {mode.label}
-                    </button>
-                  );
-                })}
+            {/* NEW MODE NAVIGATION - Cleaner tabs style */}
+            <div className="mb-8">
+              <div className="flex gap-1 bg-gray-900 p-1 rounded-lg border border-gray-800">
+                {TRAINING_MODES.map((mode) => (
+                  <button
+                    key={mode.id}
+                    onClick={() => handleModeChange(mode.id)}
+                    className={`flex-1 py-3 px-2 rounded-md text-xs font-bold transition-all duration-300 ${
+                      currentMode === mode.id 
+                        ? 'text-black shadow-lg transform scale-105' 
+                        : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                    style={currentMode === mode.id ? 
+                      {background: 'linear-gradient(45deg, #ffd700, #ffed4a)'} :
+                      {background: 'transparent'}
+                    }
+                  >
+                    {mode.label}
+                  </button>
+                ))}
               </div>
             </div>
 
+            {/* DOUBLE-IN MODE */}
             {currentMode === 'double-in' && (
               <>
-                <div className="bg-gray-900 rounded-lg p-8 text-center mb-6 shadow-2xl border-2 border-yellow-500" 
+                <div className="bg-gray-900 rounded-lg p-8 text-center mb-8 shadow-2xl border-2 border-yellow-500" 
                      style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
-                  <p className="text-lg mb-4 text-pink-400 font-semibold">WHAT'D YOU HIT?</p>
-                  <input
-                    type="number"
-                    value={diScoreInput}
-                    onChange={(e) => setDiScoreInput(e.target.value)}
-                    className="text-3xl font-bold text-center bg-gray-800 text-yellow-400 rounded p-3 w-32 border-2 border-yellow-500 focus:border-yellow-300 focus:outline-none"
-                    min="2"
-                    max="170"
-                    inputMode="numeric"
-                  />
-                  <p className="text-gray-300 text-sm mt-4">You have three darts to get in.</p>
+                  <div className="text-5xl font-black mb-4" style={goldGradient}>GET IN</div>
+                  <p className="text-gray-400 text-sm mb-6">Hit any double and enter your score.</p>
+                  <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                    <p className="text-xs text-gray-400 mb-2 uppercase tracking-wide">Score After Getting In</p>
+                    <input
+                      type="number"
+                      value={diScoreInput}
+                      onChange={(e) => setDiScoreInput(e.target.value)}
+                      placeholder="Optional"
+                      className="text-2xl font-bold text-center bg-gray-900 text-yellow-400 rounded p-3 w-full border-2 border-gray-700 focus:border-yellow-500 focus:outline-none"
+                      min="2"
+                      max="170"
+                      inputMode="numeric"
+                    />
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 mb-6">
+                <div className="grid grid-cols-3 gap-3 mb-8">
                   <button onClick={() => recordDoubleIn('success')} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
                     <div className="text-lg mb-1">✅</div>
                     <div className="text-xs font-bold">GOT IN!</div>
@@ -551,18 +553,18 @@
               </>
             )}
 
+            {/* DOUBLE-OUT MODE */}
             {currentMode === 'double-out' && (
               <>
-                <div className="bg-gray-900 rounded-lg p-8 text-center mb-6 shadow-2xl border-2 border-yellow-500" 
+                <div className="bg-gray-900 rounded-lg p-8 text-center mb-8 shadow-2xl border-2 border-yellow-500" 
                      style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
-                  <p className="text-lg mb-2 text-pink-400 font-semibold">TARGET DOUBLE:</p>
                   <div className="text-6xl font-black mb-4" style={goldGradient}>
                     {doCurrentTarget ? `D${doCurrentTarget}` : '...'}
                   </div>
-                  <p className="text-gray-300 text-sm font-medium">You have three darts to get out.</p>
+                  <p className="text-gray-400 text-sm">This is your out. You have three darts.</p>
                 </div>
 
-                <div className="grid grid-cols-4 gap-2 mb-6">
+                <div className="grid grid-cols-4 gap-2 mb-8">
                   <button onClick={() => recordDoubleOut('success')} disabled={!doCurrentTarget} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
                     <div className="text-lg mb-1">✅</div>
                     <div className="text-xs font-bold">HIT IT!</div>
@@ -583,15 +585,15 @@
               </>
             )}
 
+            {/* TRIPLES MODE */}
             {currentMode === 'triples' && (
               <>
-                <div className="bg-gray-900 rounded-lg p-8 text-center mb-6 shadow-2xl border-2 border-yellow-500" 
+                <div className="bg-gray-900 rounded-lg p-8 text-center mb-8 shadow-2xl border-2 border-yellow-500" 
                      style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
-                  <p className="text-lg mb-2 text-pink-400 font-semibold">TARGET NUMBER:</p>
                   <div className="text-6xl font-black mb-4" style={goldGradient}>
                     {tpCurrentTarget || '...'}
                   </div>
-                  <p className="text-gray-300 text-sm font-medium">Hit as many as you can with three darts.</p>
+                  <p className="text-gray-400 text-sm">Here's your target. Hit as many as you can.</p>
                 </div>
 
                 {tpCurrentTarget === 'Bull' ? (
@@ -602,7 +604,7 @@
                         <button key={n} onClick={() => recordTriples(n)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>C{n}</button>
                       ))}
                     </div>
-                    <div className="grid grid-cols-4 gap-2 mb-6">
+                    <div className="grid grid-cols-4 gap-2 mb-8">
                       {[3, 4, 5, 6].map(n => (
                         <button key={n} onClick={() => recordTriples(n)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>C{n}</button>
                       ))}
@@ -616,7 +618,7 @@
                         <button key={n} onClick={() => recordTriples(n)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>R{n}</button>
                       ))}
                     </div>
-                    <div className="grid grid-cols-5 gap-2 mb-6">
+                    <div className="grid grid-cols-5 gap-2 mb-8">
                       {[5, 6, 7, 8, 9].map(n => (
                         <button key={n} onClick={() => recordTriples(n)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>R{n}</button>
                       ))}
@@ -624,22 +626,21 @@
                   </>
                 )}
 
-                <button onClick={saveTriplesSession} disabled={tpAttempts.length === 0} className={`w-full ${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex items-center justify-center mb-6`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
+                <button onClick={saveTriplesSession} disabled={tpAttempts.length === 0} className={`w-full ${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex items-center justify-center mb-8`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
                   <div className="text-lg mr-2">💾</div>
                   <div className="text-xs font-bold">SAVE SESSION</div>
                 </button>
               </>
             )}
 
+            {/* CRICKET MODE */}
             {currentMode === 'cricket' && (
               <>
-                <div className="bg-gray-900 rounded-lg p-6 text-center mb-6 shadow-2xl border-2 border-purple-500" 
+                <div className="bg-gray-900 rounded-lg p-6 text-center mb-8 shadow-2xl border-2 border-purple-500" 
                      style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
-                  <p className="text-lg mb-2 text-pink-400 font-semibold">CLOSE ALL NUMBERS</p>
-                  <div className="text-sm text-gray-300 mb-2">
-                    Closing Speed: <span className="text-yellow-400 font-bold">{ckTotalThrows} throws</span>
-                  </div>
-                  <div className={`text-sm font-bold mb-2 h-5 ${ckPendingSelections.length >= 3 ? 'text-green-400' : ckPendingSelections.length > 0 ? 'text-blue-400' : 'text-transparent'}`}>
+                  <div className="text-4xl font-black mb-4" style={goldGradient}>CLOSE ALL NUMBERS</div>
+                  <p className="text-gray-400 text-sm mb-2">You're playing Cricket with no scoring.</p>
+                  <div className={`text-sm font-bold h-5 ${ckPendingSelections.length >= 3 ? 'text-green-400' : ckPendingSelections.length > 0 ? 'text-blue-400' : 'text-transparent'}`}>
                     {ckPendingSelections.length > 0 ? (
                       <>
                         This Round: {ckPendingSelections.length} dart{ckPendingSelections.length !== 1 ? 's' : ''} selected
@@ -651,7 +652,7 @@
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="grid grid-cols-3 gap-2 mb-6">
                   <button
                     onClick={handleCricketSubmit}
                     disabled={ckPendingSelections.length === 0}
@@ -685,7 +686,7 @@
                   </button>
                 </div>
 
-                <div className="bg-gray-900 rounded-lg p-4 mb-4 border border-gray-800">
+                <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
                   <div className="space-y-3">
                     {ckNumbers.map(num => {
                       const remaining = ckGetRemainingHits(num);
@@ -810,7 +811,7 @@
                   </div>
                 </div>
 
-                <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
+                <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
                   <h3 className="text-lg font-bold mb-3 text-pink-400">📊 STATS</h3>
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <div>
@@ -829,7 +830,7 @@
                 </div>
 
                 {ckCompletedGames.length > 0 && (
-                  <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
+                  <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
                     <h3 className="text-lg font-bold mb-3 text-pink-400">🎯 RECENT GAMES</h3>
                     <div className="space-y-2 max-h-40 overflow-y-auto">
                       {ckCompletedGames.slice(0, 10).map((game, i) => (
@@ -845,21 +846,81 @@
               </>
             )}
 
+            {/* STATS SECTION - More breathing room */}
+            {currentMode !== 'history' && currentMode !== 'cricket' && (
+              <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+                <h3 className="text-lg font-bold mb-3 text-pink-400">📊 STATS</h3>
+                {currentMode === 'triples' ? (
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div><div className="text-2xl font-bold text-yellow-400">{getCurrentStats().total}</div><div className="text-sm text-gray-300 font-medium">TOTAL ATTEMPTS</div></div>
+                    <div><div className="text-2xl font-bold" style={goldGradient}>{getCurrentStats().avgRounds}</div><div className="text-sm text-gray-300 font-medium">AVG ROUNDS</div></div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div><div className="text-2xl font-bold text-yellow-400">{getCurrentStats().total}</div><div className="text-sm text-gray-300 font-medium">TOTAL ATTEMPTS</div></div>
+                    <div><div className="text-2xl font-bold" style={goldGradient}>{getCurrentStats().successRate}%</div><div className="text-sm text-gray-300 font-medium">SUCCESS RATE</div></div>
+                    <div><div className="text-2xl font-bold text-green-400">{getCurrentStats().successes}</div><div className="text-sm text-gray-300 font-medium">{currentMode === 'double-out' ? 'GOT OUT' : 'GOT IN'}</div></div>
+                    <div><div className="text-2xl font-bold text-red-400">{getCurrentStats().failures}</div><div className="text-sm text-gray-300 font-medium">MISS</div></div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* RECENT ATTEMPTS - More breathing room */}
+            {currentMode !== 'history' && currentMode !== 'cricket' && getCurrentAttempts().length > 0 && (
+              <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+                <h3 className="text-lg font-bold mb-3 text-pink-400">📝 RECENT {currentMode === 'triples' ? 'THROWS' : currentMode === 'double-out' ? 'ATTEMPTS' : 'INS'}</h3>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {getCurrentAttempts().slice(0, 10).map((a, i) => (
+                    <div key={i} className="flex justify-between items-center text-sm bg-gray-800 p-2 rounded">
+                      <span className="text-yellow-400 font-semibold">
+                        {currentMode === 'triples' ? a.number : currentMode === 'double-out' ? `D${a.number}` : (a.outcome === 'success' && a.score ? `Score: ${a.score}` : 'DOUBLE IN')}
+                      </span>
+                      <span className={`font-semibold ${currentMode === 'triples' ? 'text-blue-400' : a.outcome === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+                        {currentMode === 'triples' ? (a.rounds === 0 ? '❌ MISS' : `✅ ${a.number === 'Bull' ? 'C' : 'R'}${a.rounds}`) : (a.outcome === 'success' ? (currentMode === 'double-out' ? '✅' : '✅ GOT IN') : (currentMode === 'double-out' ? '❌' : '❌ MISSED'))}
+                      </span>
+                      <span className="text-gray-400 text-xs">{a.timestamp}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* SAVE STATUS */}
+            {saveStatus && (
+              <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+                <div className="text-xs text-center text-yellow-300 font-semibold">{saveStatus}</div>
+              </div>
+            )}
+
+            {/* HISTORY BUTTON - Now at bottom, more prominent */}
+            {currentMode !== 'history' && (
+              <div className="mb-8">
+                <button
+                  onClick={() => handleModeChange('history')}
+                  className="w-full py-4 px-6 rounded-lg font-bold text-base transition-all transform hover:scale-105 shadow-lg bg-gray-800 text-yellow-400 border-2 border-gray-700 hover:border-gray-600"
+                >
+                  📊 VIEW TRAINING HISTORY
+                </button>
+              </div>
+            )}
+
+            {/* HISTORY VIEW */}
             {currentMode === 'history' && (
               <>
-                <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
+                <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
                   <h3 className="text-lg font-bold mb-3 text-pink-400">📊 OVERALL STATS</h3>
                   <div className="grid grid-cols-2 gap-4 text-center">
                     <div><div className="text-2xl font-bold text-yellow-400">{sessions.length}</div><div className="text-sm text-gray-300 font-medium">TOTAL SESSIONS</div></div>
                     <div><div className="text-2xl font-bold text-blue-400">{sessions.filter(s => s.mode === 'double-in').length}</div><div className="text-sm text-gray-300 font-medium">DOUBLE-IN</div></div>
                     <div><div className="text-2xl font-bold text-green-400">{sessions.filter(s => s.mode === 'double-out').length}</div><div className="text-sm text-gray-300 font-medium">DOUBLE-OUT</div></div>
                     <div><div className="text-2xl font-bold text-purple-400">{sessions.filter(s => s.mode === 'triples').length}</div><div className="text-sm text-gray-300 font-medium">TRIPLES</div></div>
-                    <div><div className="text-2xl font-bold text-pink-400">{sessions.filter(s => s.mode === 'cricket').length}</div><div className="text-sm text-gray-300 font-medium">CRICKET</div></div>
+                    <div className="col-span-2"><div className="text-2xl font-bold text-pink-400">{sessions.filter(s => s.mode === 'cricket').length}</div><div className="text-sm text-gray-300 font-medium">CRICKET</div></div>
                   </div>
                 </div>
 
                 {sessions.length > 0 ? (
-                  <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
+                  <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
                     <h3 className="text-lg font-bold mb-3 text-pink-400">📈 SESSION HISTORY</h3>
                     <div className="space-y-2 max-h-96 overflow-y-auto">
                       {sessions.map((s, idx) => {
@@ -911,12 +972,12 @@
                     <p className="text-xs text-gray-500 mt-3">Your last 20 sessions are saved. Use the same device to practice.</p>
                   </div>
                 ) : (
-                  <div className="bg-gray-900 rounded-lg p-8 text-center mb-6 border border-gray-800">
+                  <div className="bg-gray-900 rounded-lg p-8 text-center mb-8 border border-gray-800">
                     <p className="text-gray-400 text-sm">No sessions yet. Complete a training session to see it here!</p>
                   </div>
                 )}
 
-                <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
+                <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
                   <div className="flex items-start mb-3">
                     <input type="checkbox" id="confirmClear" checked={confirmClear} onChange={(e) => setConfirmClear(e.target.checked)} className="mt-1 mr-3 w-5 h-5 cursor-pointer" />
                     <label htmlFor="confirmClear" className="text-sm text-gray-300 cursor-pointer">Delete all session history and start again.</label>
@@ -925,53 +986,18 @@
                     🧹 CLEAR ALL PRACTICE DATA
                   </button>
                 </div>
+
+                {/* Back button */}
+                <button
+                  onClick={() => handleModeChange('double-in')}
+                  className="w-full py-3 px-6 rounded-lg font-bold text-sm transition-all transform hover:scale-105 shadow-lg bg-gray-800 text-gray-300 border border-gray-700 hover:border-gray-600 mb-8"
+                >
+                  ← BACK TO TRAINING
+                </button>
               </>
             )}
 
-            {currentMode !== 'history' && currentMode !== 'cricket' && (
-              <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-                <h3 className="text-lg font-bold mb-3 text-pink-400">📊 STATS</h3>
-                {currentMode === 'triples' ? (
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div><div className="text-2xl font-bold text-yellow-400">{getCurrentStats().total}</div><div className="text-sm text-gray-300 font-medium">TOTAL ATTEMPTS</div></div>
-                    <div><div className="text-2xl font-bold" style={goldGradient}>{getCurrentStats().avgRounds}</div><div className="text-sm text-gray-300 font-medium">AVG ROUNDS</div></div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div><div className="text-2xl font-bold text-yellow-400">{getCurrentStats().total}</div><div className="text-sm text-gray-300 font-medium">TOTAL ATTEMPTS</div></div>
-                    <div><div className="text-2xl font-bold" style={goldGradient}>{getCurrentStats().successRate}%</div><div className="text-sm text-gray-300 font-medium">SUCCESS RATE</div></div>
-                    <div><div className="text-2xl font-bold text-green-400">{getCurrentStats().successes}</div><div className="text-sm text-gray-300 font-medium">{currentMode === 'double-out' ? 'GOT OUT' : 'GOT IN'}</div></div>
-                    <div><div className="text-2xl font-bold text-red-400">{getCurrentStats().failures}</div><div className="text-sm text-gray-300 font-medium">MISS</div></div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {currentMode !== 'history' && currentMode !== 'cricket' && getCurrentAttempts().length > 0 && (
-              <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-                <h3 className="text-lg font-bold mb-3 text-pink-400">📝 RECENT {currentMode === 'triples' ? 'THROWS' : currentMode === 'double-out' ? 'ATTEMPTS' : 'INS'}</h3>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {getCurrentAttempts().slice(0, 10).map((a, i) => (
-                    <div key={i} className="flex justify-between items-center text-sm bg-gray-800 p-2 rounded">
-                      <span className="text-yellow-400 font-semibold">
-                        {currentMode === 'triples' ? a.number : currentMode === 'double-out' ? `D${a.number}` : (a.outcome === 'success' && a.score ? `Score: ${a.score}` : 'DOUBLE IN')}
-                      </span>
-                      <span className={`font-semibold ${currentMode === 'triples' ? 'text-blue-400' : a.outcome === 'success' ? 'text-green-400' : 'text-red-400'}`}>
-                        {currentMode === 'triples' ? (a.rounds === 0 ? '❌ MISS' : `✅ ${a.number === 'Bull' ? 'C' : 'R'}${a.rounds}`) : (a.outcome === 'success' ? (currentMode === 'double-out' ? '✅' : '✅ GOT IN') : (currentMode === 'double-out' ? '❌' : '❌ MISSED'))}
-                      </span>
-                      <span className="text-gray-400 text-xs">{a.timestamp}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {saveStatus && (
-              <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-                <div className="text-xs text-center text-yellow-300 font-semibold">{saveStatus}</div>
-              </div>
-            )}
-
+            {/* FOOTER */}
             <div className="text-center mt-12 mb-12">
               <div className="text-4xl" style={{letterSpacing: '0.5em'}}>🤜👈</div>
             </div>
