@@ -127,8 +127,9 @@
           return;
         }
         
-        // Don't auto-scroll for History mode
+        // Scroll to top for History mode
         if (currentMode === 'history') {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
           return;
         }
         
