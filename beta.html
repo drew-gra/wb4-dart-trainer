@@ -519,21 +519,17 @@
               <>
                 <div className="bg-gray-900 rounded-lg p-8 text-center mb-8 shadow-2xl border-2 border-yellow-500" 
                      style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
-                  <div className="text-5xl font-black mb-4" style={goldGradient}>GET IN</div>
+                  <div className="text-5xl font-black mb-6" style={goldGradient}>GET IN</div>
                   <p className="text-gray-400 text-sm mb-6">Hit any double and enter your score.</p>
-                  <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-                    <p className="text-xs text-gray-400 mb-2 uppercase tracking-wide">Score After Getting In</p>
-                    <input
-                      type="number"
-                      value={diScoreInput}
-                      onChange={(e) => setDiScoreInput(e.target.value)}
-                      placeholder="Optional"
-                      className="text-2xl font-bold text-center bg-gray-900 text-yellow-400 rounded p-3 w-full border-2 border-gray-700 focus:border-yellow-500 focus:outline-none"
-                      min="2"
-                      max="170"
-                      inputMode="numeric"
-                    />
-                  </div>
+                  <input
+                    type="number"
+                    value={diScoreInput}
+                    onChange={(e) => setDiScoreInput(e.target.value)}
+                    className="text-3xl font-bold text-center bg-gray-800 text-yellow-400 rounded p-3 w-32 border-2 border-yellow-500 focus:border-yellow-300 focus:outline-none"
+                    min="2"
+                    max="170"
+                    inputMode="numeric"
+                  />
                 </div>
 
                 <div className="grid grid-cols-3 gap-3 mb-8">
@@ -846,65 +842,6 @@
               </>
             )}
 
-            {/* STATS SECTION - More breathing room */}
-            {currentMode !== 'history' && currentMode !== 'cricket' && (
-              <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
-                <h3 className="text-lg font-bold mb-3 text-pink-400">📊 STATS</h3>
-                {currentMode === 'triples' ? (
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div><div className="text-2xl font-bold text-yellow-400">{getCurrentStats().total}</div><div className="text-sm text-gray-300 font-medium">TOTAL ATTEMPTS</div></div>
-                    <div><div className="text-2xl font-bold" style={goldGradient}>{getCurrentStats().avgRounds}</div><div className="text-sm text-gray-300 font-medium">AVG ROUNDS</div></div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div><div className="text-2xl font-bold text-yellow-400">{getCurrentStats().total}</div><div className="text-sm text-gray-300 font-medium">TOTAL ATTEMPTS</div></div>
-                    <div><div className="text-2xl font-bold" style={goldGradient}>{getCurrentStats().successRate}%</div><div className="text-sm text-gray-300 font-medium">SUCCESS RATE</div></div>
-                    <div><div className="text-2xl font-bold text-green-400">{getCurrentStats().successes}</div><div className="text-sm text-gray-300 font-medium">{currentMode === 'double-out' ? 'GOT OUT' : 'GOT IN'}</div></div>
-                    <div><div className="text-2xl font-bold text-red-400">{getCurrentStats().failures}</div><div className="text-sm text-gray-300 font-medium">MISS</div></div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* RECENT ATTEMPTS - More breathing room */}
-            {currentMode !== 'history' && currentMode !== 'cricket' && getCurrentAttempts().length > 0 && (
-              <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
-                <h3 className="text-lg font-bold mb-3 text-pink-400">📝 RECENT {currentMode === 'triples' ? 'THROWS' : currentMode === 'double-out' ? 'ATTEMPTS' : 'INS'}</h3>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {getCurrentAttempts().slice(0, 10).map((a, i) => (
-                    <div key={i} className="flex justify-between items-center text-sm bg-gray-800 p-2 rounded">
-                      <span className="text-yellow-400 font-semibold">
-                        {currentMode === 'triples' ? a.number : currentMode === 'double-out' ? `D${a.number}` : (a.outcome === 'success' && a.score ? `Score: ${a.score}` : 'DOUBLE IN')}
-                      </span>
-                      <span className={`font-semibold ${currentMode === 'triples' ? 'text-blue-400' : a.outcome === 'success' ? 'text-green-400' : 'text-red-400'}`}>
-                        {currentMode === 'triples' ? (a.rounds === 0 ? '❌ MISS' : `✅ ${a.number === 'Bull' ? 'C' : 'R'}${a.rounds}`) : (a.outcome === 'success' ? (currentMode === 'double-out' ? '✅' : '✅ GOT IN') : (currentMode === 'double-out' ? '❌' : '❌ MISSED'))}
-                      </span>
-                      <span className="text-gray-400 text-xs">{a.timestamp}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* SAVE STATUS */}
-            {saveStatus && (
-              <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
-                <div className="text-xs text-center text-yellow-300 font-semibold">{saveStatus}</div>
-              </div>
-            )}
-
-            {/* HISTORY BUTTON - Now at bottom, more prominent */}
-            {currentMode !== 'history' && (
-              <div className="mb-8">
-                <button
-                  onClick={() => handleModeChange('history')}
-                  className="w-full py-4 px-6 rounded-lg font-bold text-base transition-all transform hover:scale-105 shadow-lg bg-gray-800 text-yellow-400 border-2 border-gray-700 hover:border-gray-600"
-                >
-                  📊 VIEW TRAINING HISTORY
-                </button>
-              </div>
-            )}
-
             {/* HISTORY VIEW */}
             {currentMode === 'history' && (
               <>
@@ -995,6 +932,65 @@
                   ← BACK TO TRAINING
                 </button>
               </>
+            )}
+
+            {/* STATS SECTION - More breathing room */}
+            {currentMode !== 'history' && currentMode !== 'cricket' && (
+              <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+                <h3 className="text-lg font-bold mb-3 text-pink-400">📊 STATS</h3>
+                {currentMode === 'triples' ? (
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div><div className="text-2xl font-bold text-yellow-400">{getCurrentStats().total}</div><div className="text-sm text-gray-300 font-medium">TOTAL ATTEMPTS</div></div>
+                    <div><div className="text-2xl font-bold" style={goldGradient}>{getCurrentStats().avgRounds}</div><div className="text-sm text-gray-300 font-medium">AVG ROUNDS</div></div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div><div className="text-2xl font-bold text-yellow-400">{getCurrentStats().total}</div><div className="text-sm text-gray-300 font-medium">TOTAL ATTEMPTS</div></div>
+                    <div><div className="text-2xl font-bold" style={goldGradient}>{getCurrentStats().successRate}%</div><div className="text-sm text-gray-300 font-medium">SUCCESS RATE</div></div>
+                    <div><div className="text-2xl font-bold text-green-400">{getCurrentStats().successes}</div><div className="text-sm text-gray-300 font-medium">{currentMode === 'double-out' ? 'GOT OUT' : 'GOT IN'}</div></div>
+                    <div><div className="text-2xl font-bold text-red-400">{getCurrentStats().failures}</div><div className="text-sm text-gray-300 font-medium">MISS</div></div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* RECENT ATTEMPTS - More breathing room */}
+            {currentMode !== 'history' && currentMode !== 'cricket' && getCurrentAttempts().length > 0 && (
+              <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+                <h3 className="text-lg font-bold mb-3 text-pink-400">📝 RECENT {currentMode === 'triples' ? 'THROWS' : currentMode === 'double-out' ? 'ATTEMPTS' : 'INS'}</h3>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {getCurrentAttempts().slice(0, 10).map((a, i) => (
+                    <div key={i} className="flex justify-between items-center text-sm bg-gray-800 p-2 rounded">
+                      <span className="text-yellow-400 font-semibold">
+                        {currentMode === 'triples' ? a.number : currentMode === 'double-out' ? `D${a.number}` : (a.outcome === 'success' && a.score ? `Score: ${a.score}` : 'DOUBLE IN')}
+                      </span>
+                      <span className={`font-semibold ${currentMode === 'triples' ? 'text-blue-400' : a.outcome === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+                        {currentMode === 'triples' ? (a.rounds === 0 ? '❌ MISS' : `✅ ${a.number === 'Bull' ? 'C' : 'R'}${a.rounds}`) : (a.outcome === 'success' ? (currentMode === 'double-out' ? '✅' : '✅ GOT IN') : (currentMode === 'double-out' ? '❌' : '❌ MISSED'))}
+                      </span>
+                      <span className="text-gray-400 text-xs">{a.timestamp}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* SAVE STATUS */}
+            {saveStatus && (
+              <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+                <div className="text-xs text-center text-yellow-300 font-semibold">{saveStatus}</div>
+              </div>
+            )}
+
+            {/* HISTORY BUTTON - Now at bottom, more prominent */}
+            {currentMode !== 'history' && (
+              <div className="mb-8">
+                <button
+                  onClick={() => handleModeChange('history')}
+                  className="w-full py-4 px-6 rounded-lg font-bold text-base transition-all transform hover:scale-105 shadow-lg bg-gray-800 text-yellow-400 border-2 border-gray-700 hover:border-gray-600"
+                >
+                  📊 VIEW TRAINING HISTORY
+                </button>
+              </div>
             )}
 
             {/* FOOTER */}
