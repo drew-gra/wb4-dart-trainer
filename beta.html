@@ -68,7 +68,7 @@
 
     // MAIN COMPONENT
     const WB4DartTrainer = () => {
-      const [currentMode, setCurrentMode] = useState('double-in');
+      const [currentMode, setCurrentMode] = useState(null);
       const [saveStatus, setSaveStatus] = useState('');
       const [confirmClear, setConfirmClear] = useState(false);
       const { sessions, addSession, clearSessions } = useSessionManager();
@@ -95,6 +95,7 @@
       const [ckGameStart, setCkGameStart] = useState(null);
       const [ckCompletedGames, setCkCompletedGames] = useState([]);
       const [ckPendingSelections, setCkPendingSelections] = useState([]);
+      const [ckTargetData, setCkTargetData] = useState({}); // Track singles/doubles/triples per number
 
       const PRIORITY_DOUBLES = [16, 20, 8, 12];
       const TRIPLES_NUMBERS = [15, 16, 17, 18, 19, 20, 'Bull'];
@@ -120,15 +121,15 @@
         trackEvent('Mode Changed', { mode });
       };
 
-      // Scroll to content when mode changes (but not on initial load or when going to History)
+      // Scroll to content when mode changes (but not on initial load or when going to History/Insights)
       useEffect(() => {
         if (isInitialMount.current) {
           isInitialMount.current = false;
           return;
         }
         
-        // Scroll to top for History mode
-        if (currentMode === 'history') {
+        // Scroll to top for History, Insights, and landing page (null)
+        if (currentMode === 'history' || currentMode === 'insights' || currentMode === null) {
           window.scrollTo({ top: 0, behavior: 'smooth' });
           return;
         }
@@ -163,6 +164,207 @@
         const avgThrows = total > 0 ? (totalThrows / total).toFixed(1) : 0;
         const bestGame = total > 0 ? Math.min(...attempts.map(a => a.throws)) : 0;
         return { total, totalThrows, avgThrows, bestGame };
+      };
+
+      /*
+       * ═══════════════════════════════════════════════════════════════
+       * HEAT MAP DATA ARCHITECTURE (Option B - Aggregated per session)
+       * ═══════════════════════════════════════════════════════════════
+       * 
+       * Current: We store aggregated targetData per session for efficiency.
+       * Each session includes: { targetData: { 16: {attempts: 5, hits: 3}, ... } }
+       * 
+       * Valid data sources:
+       * - Double-Out: App assigns target → knows attempts + outcomes
+       * - Triples: App assigns target → knows rounds thrown at each target
+       * - Cricket: User clicks specific buttons (T20, 20, D20) → knows exact hits
+       * 
+       * Invalid data sources (not included):
+       * - Double-In: User chooses target → app cannot verify intent
+       * 
+       * FUTURE CONSIDERATION (Option A - Granular):
+       * If we need individual attempt timestamps, streak analysis, or time-series
+       * data in the future, consider migrating to:
+       * { attempts: [{ target: 16, type: 'double', success: true, timestamp: ... }] }
+       * 
+       * Migration path: Keep Option B structure, add optional attempts[] array.
+       * This allows backward compatibility while supporting granular tracking.
+       * 
+       * Estimated storage impact: ~150KB vs current ~20KB for 100 sessions
+       * ═══════════════════════════════════════════════════════════════
+       */
+
+      // Aggregate attempts into targetData for heat map
+      const buildDoubleOutTargetData = (attempts) => {
+        const targetData = {};
+        attempts.forEach(attempt => {
+          const num = attempt.number;
+          if (!targetData[num]) {
+            targetData[num] = { attempts: 0, hits: 0 };
+          }
+          targetData[num].attempts++;
+          if (attempt.outcome === 'success') {
+            targetData[num].hits++;
+          }
+        });
+        return targetData;
+      };
+
+      const buildTriplesTargetData = (attempts) => {
+        const targetData = {};
+        attempts.forEach(attempt => {
+          const num = attempt.number;
+          if (!targetData[num]) {
+            targetData[num] = { attempts: 0, totalMarks: 0 };
+          }
+          targetData[num].attempts++;  // Count each 3-dart attempt
+          targetData[num].totalMarks += attempt.rounds || 0;  // Sum the marks (confusingly called "rounds")
+        });
+        return targetData;
+      };
+
+      // Aggregate heat map data across all sessions
+      const aggregateHeatMapData = () => {
+        const aggregated = {};
+        
+        sessions.forEach(session => {
+          // Only include sessions with location data (double-out, triples, and cricket)
+          if (session.mode !== 'double-out' && session.mode !== 'triples' && session.mode !== 'cricket') return;
+          if (!session.targetData) return;
+          
+          Object.entries(session.targetData).forEach(([num, data]) => {
+            if (!aggregated[num]) {
+              aggregated[num] = { attempts: 0, hits: 0, triplesAttempts: 0, totalMarks: 0 };
+            }
+            
+            if (session.mode === 'double-out') {
+              aggregated[num].attempts += data.attempts || 0;
+              aggregated[num].hits += data.hits || 0;
+            } else if (session.mode === 'triples') {
+              aggregated[num].triplesAttempts += data.attempts || 0;  // Number of 3-dart attempts
+              aggregated[num].totalMarks += data.totalMarks || 0;     // Sum of marks
+            } else if (session.mode === 'cricket') {
+              // Cricket provides direct counts of singles/doubles/triples hit
+              // For doubles analysis: add to attempts and hits
+              if (data.doubles > 0) {
+                aggregated[num].attempts += data.doubles;
+                aggregated[num].hits += data.doubles; // They hit what they aimed at
+              }
+              
+              // For triples analysis: convert to marks and attempts
+              // Each triple button press = 1 attempt at triple, worth 3 marks if hit
+              if (data.triples > 0) {
+                aggregated[num].triplesAttempts += data.triples;
+                aggregated[num].totalMarks += data.triples * 3; // Each triple = 3 marks
+              }
+            }
+          });
+        });
+        
+        return aggregated;
+      };
+
+      // Regional analysis for insights
+      const regions = {
+        top: { name: 'Top', numbers: [5, 20, 1, 18, 4, 13] },
+        right: { name: 'Right', numbers: [13, 6, 10, 15, 2, 17] },
+        bottom: { name: 'Bottom', numbers: [17, 3, 19, 7, 16, 8] },
+        left: { name: 'Left', numbers: [8, 11, 14, 9, 12, 5] }
+      };
+
+      const calculateRegionalAnalysis = () => {
+        const heatData = aggregateHeatMapData();
+        
+        // Calculate effectiveness for a single number
+        const getNumberEffectiveness = (num) => {
+          const d = heatData[num];
+          if (!d) return { doubleRate: 0, tripleRate: 0, totalWeight: 0 };
+          
+          const doubleRate = d.attempts > 0 ? (d.hits / d.attempts) * 100 : 0;
+          const tripleMPR = d.triplesAttempts > 0 ? d.totalMarks / d.triplesAttempts : 0;
+          const tripleRate = (tripleMPR / 9) * 100; // Normalize to percentage
+          
+          const totalWeight = d.attempts + d.triplesAttempts;
+          
+          return { doubleRate, tripleRate, totalWeight };
+        };
+
+        // Calculate regional score
+        const getRegionalScore = (numbers) => {
+          let totalWeightedScore = 0;
+          let totalWeight = 0;
+
+          numbers.forEach(num => {
+            const { doubleRate, tripleRate, totalWeight: weight } = getNumberEffectiveness(num);
+            const d = heatData[num];
+            
+            const doubleWeight = d?.attempts || 0;
+            const tripleWeight = d?.triplesAttempts || 0;
+            
+            const numberScore = doubleWeight + tripleWeight > 0
+              ? (doubleRate * doubleWeight + tripleRate * tripleWeight) / (doubleWeight + tripleWeight)
+              : 0;
+            
+            totalWeightedScore += numberScore * weight;
+            totalWeight += weight;
+          });
+
+          const regionalScore = totalWeight > 0 ? totalWeightedScore / totalWeight : 0;
+          return { score: regionalScore, weight: totalWeight };
+        };
+
+        // Analyze all regions
+        const analysis = {};
+        Object.entries(regions).forEach(([key, region]) => {
+          analysis[key] = {
+            ...region,
+            ...getRegionalScore(region.numbers)
+          };
+        });
+
+        return analysis;
+      };
+
+      const calculateDataSufficiency = () => {
+        const heatData = aggregateHeatMapData();
+        const allNumbers = Object.keys(heatData);
+        
+        // Calculate total DARTS thrown (not attempts/turns)
+        // Double-Out and Triples: each attempt = 1 turn = 3 darts
+        // Cricket: each button press = 1 dart
+        const totalDarts = allNumbers.reduce((sum, num) => {
+          const d = heatData[num];
+          const doubleOutDarts = (d?.attempts || 0) * 3;  // Each attempt = 3 darts
+          const triplesDarts = (d?.triplesAttempts || 0) * 3;  // Each attempt = 3 darts
+          // Cricket singles/doubles/triples are already individual darts
+          return sum + doubleOutDarts + triplesDarts;
+        }, 0);
+
+        // Check per-region minimums (in darts)
+        const regionData = {};
+        Object.entries(regions).forEach(([key, region]) => {
+          const darts = region.numbers.reduce((sum, num) => {
+            const d = heatData[num];
+            const doubleOutDarts = (d?.attempts || 0) * 3;
+            const triplesDarts = (d?.triplesAttempts || 0) * 3;
+            return sum + doubleOutDarts + triplesDarts;
+          }, 0);
+          regionData[key] = darts;
+        });
+
+        const minRegion = Math.min(...Object.values(regionData));
+        const regionsWithData = Object.values(regionData).filter(a => a > 0).length;
+
+        return {
+          totalAttempts: totalDarts,  // Now in darts, not turns
+          regionData,
+          minRegion,
+          regionsWithData,
+          hasMinimum: totalDarts >= 360 && regionsWithData === 4 && minRegion >= 90,
+          confidence: totalDarts < 360 ? 'insufficient' : 
+                      totalDarts < 720 ? 'initial' : 
+                      totalDarts < 1440 ? 'solid' : 'high'
+        };
       };
 
       const generateDoubleOutTarget = () => {
@@ -204,6 +406,7 @@
         if (doAttempts.length === 0) return;
         
         const stats = calculateStats(doAttempts);
+        const targetData = buildDoubleOutTargetData(doAttempts);
         const duration = Math.round((new Date() - doSessionStart) / 60000);
         
         addSession({
@@ -215,7 +418,8 @@
           totalAttempts: stats.total,
           successRate: stats.successRate,
           successes: stats.successes,
-          failures: stats.failures
+          failures: stats.failures,
+          targetData  // Heat map data
         });
 
         trackEvent('Training Session Completed', {
@@ -319,6 +523,7 @@
         if (tpAttempts.length === 0) return;
 
         const stats = calculateTriplesStats(tpAttempts);
+        const targetData = buildTriplesTargetData(tpAttempts);
         const duration = Math.round((new Date() - tpSessionStart) / 60000);
 
         addSession({
@@ -329,7 +534,8 @@
           duration,
           totalAttempts: stats.total,
           totalRounds: stats.totalRounds,
-          avgRounds: stats.avgRounds
+          avgRounds: stats.avgRounds,
+          targetData  // Heat map data
         });
 
         trackEvent('Training Session Completed', {
@@ -372,6 +578,15 @@
           const duration = Math.round((now - ckGameStart) / 60000) || 1;
           const missRate = ckTotalThrows > 0 ? Math.round((ckMissCount / ckTotalThrows) * 100) : 0;
           
+          // Calculate TB% (Triple and Bull percentage)
+          const triplesCount = Object.entries(ckTargetData)
+            .filter(([num]) => num !== 'Bull')
+            .reduce((sum, [_, data]) => sum + (data.triples || 0), 0);
+          const singleBulls = ckTargetData.Bull?.singles || 0;
+          const doubleBulls = ckTargetData.Bull?.doubles || 0;
+          const tbCount = triplesCount + singleBulls + doubleBulls;
+          const tbRate = ckTotalThrows > 0 ? Math.round((tbCount / ckTotalThrows) * 100) : 0;
+          
           addSession({
             id: Date.now(),
             mode: 'cricket',
@@ -379,7 +594,9 @@
             endTime: now.toISOString(),
             duration,
             throws: ckTotalThrows,
-            missRate: missRate
+            missRate: missRate,  // Miss% - already calculated
+            tbRate: tbRate,      // TB% - triples and bulls percentage
+            targetData: ckTargetData  // Heat map data
           });
           
           showStatus('🎯 Game Complete! Starting new game...', 2000);
@@ -390,6 +607,7 @@
             setCkMissCount(0);
             setCkGameStart(null);
             setCkPendingSelections([]);
+            setCkTargetData({});  // Reset target data for new game
           }, 2000);
         }
       }, [ckIsComplete, ckGameStart, ckTotalThrows]);
@@ -415,13 +633,31 @@
         const newHits = { ...ckHits };
         const missCount = ckPendingSelections.filter(s => s.type === 'miss').length;
         
+        // Track targetData for heat map analysis
+        const newTargetData = { ...ckTargetData };
+        
         ckPendingSelections.forEach(selection => {
           if (selection.type === 'hit') {
             newHits[selection.number] = Math.min(3, newHits[selection.number] + selection.count);
+            
+            // Track what type of hit (single/double/triple)
+            const num = selection.number;
+            if (!newTargetData[num]) {
+              newTargetData[num] = { singles: 0, doubles: 0, triples: 0 };
+            }
+            
+            if (selection.count === 1) {
+              newTargetData[num].singles++;
+            } else if (selection.count === 2) {
+              newTargetData[num].doubles++;
+            } else if (selection.count === 3) {
+              newTargetData[num].triples++;
+            }
           }
         });
         
         setCkHits(newHits);
+        setCkTargetData(newTargetData);
         setCkTotalThrows(prev => prev + ckPendingSelections.length);
         setCkMissCount(prev => prev + missCount);
         setCkPendingSelections([]);
@@ -914,6 +1150,108 @@
               </>
             )}
 
+            {/* INSIGHTS VIEW */}
+            {currentMode === 'insights' && (() => {
+              const dataSufficiency = calculateDataSufficiency();
+              const regionalAnalysis = calculateRegionalAnalysis();
+              const sortedRegions = Object.entries(regionalAnalysis).sort((a, b) => a[1].score - b[1].score);
+              const weakest = sortedRegions[0];
+              const strongest = sortedRegions[sortedRegions.length - 1];
+
+              return (
+                <>
+                  {!dataSufficiency.hasMinimum ? (
+                    // PROGRESS METER - Not enough data yet
+                    <div className="bg-gray-900 rounded-lg p-6 mb-6 border border-gray-800">
+                      <h3 className="text-base font-bold mb-4 text-pink-400">⚠ NOT ENOUGH DATA FOR RECOMMENDATIONS</h3>
+                      
+                      <p className="text-sm text-gray-300 mb-6">
+                        Good news: You need to throw more darts!<br/><br/>I need more data to provide real advice. Once these thresholds are met, I can tell you what the data says you should work on.
+                      </p>
+                      
+                      <div className="mb-6">
+                        <div className="flex justify-between mb-2">
+                          <span className="text-sm text-gray-300">Total Darts</span>
+                          <span className="text-sm font-bold text-white">{dataSufficiency.totalAttempts} / 360</span>
+                        </div>
+                        <div className="w-full bg-gray-700 rounded-full h-4">
+                          <div 
+                            className={`h-4 rounded-full transition-all ${
+                              dataSufficiency.totalAttempts >= 360 ? 'bg-purple-600' : 'bg-yellow-500'
+                            }`}
+                            style={{width: `${Math.min(100, (dataSufficiency.totalAttempts / 360) * 100)}%`}}
+                          ></div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        {Object.entries(dataSufficiency.regionData).map(([key, attempts]) => (
+                          <div key={key} className="text-sm">
+                            <span className="text-gray-300 capitalize">{regions[key].name}: </span>
+                            <span className={`font-bold ${attempts >= 90 ? 'text-green-400' : 'text-purple-400'}`}>
+                              {attempts >= 90 ? 'Sufficient data' : 'Not sufficient data'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    // RECOMMENDATION - Enough data
+                    <div className="rounded-lg p-6 border-2" style={{
+                      background: 'linear-gradient(145deg, #374151, #1f2937)',
+                      borderColor: '#fbbf24'
+                    }}>
+                      <h3 className="text-2xl font-bold mb-4 text-pink-400">💡 YOUR PRACTICE FOCUS</h3>
+                      <p className="text-lg text-white mb-6">
+                        The data says you need to work on {weakest[1].name === 'Top' ? 'the top of the board' : 
+                                                           weakest[1].name === 'Right' ? 'the right side of the board' :
+                                                           weakest[1].name === 'Bottom' ? 'the bottom of the board' :
+                                                           'the left side of the board'}. Your efficiency there is {(() => {
+                          const meanScore = sortedRegions.reduce((sum, r) => sum + r[1].score, 0) / sortedRegions.length;
+                          const weakestDiff = ((meanScore - weakest[1].score) / meanScore) * 100;
+                          return weakestDiff.toFixed(0);
+                        })()}% lower than everyplace else on the board.
+                        <br/><br/>
+                        Your strongest area is {strongest[1].name === 'Top' ? 'the top of the board' : 
+                                                strongest[1].name === 'Right' ? 'the right side of the board' :
+                                                strongest[1].name === 'Bottom' ? 'the bottom of the board' :
+                                                'the left side of the board'}, where your efficiency is {(() => {
+                          const meanScore = sortedRegions.reduce((sum, r) => sum + r[1].score, 0) / sortedRegions.length;
+                          const strongestDiff = ((strongest[1].score - meanScore) / meanScore) * 100;
+                          return strongestDiff.toFixed(0);
+                        })()}% greater than the other areas.
+                      </p>
+                      <button 
+                        className="w-full py-3 px-4 rounded-lg font-bold text-base transition-all border-2"
+                        style={{
+                          backgroundColor: '#1f2937',
+                          borderColor: '#fbbf24',
+                          color: '#9ca3af',
+                          cursor: 'not-allowed'
+                        }}
+                        disabled
+                      >
+                        🎯 TARGETED PRACTICE MODE (COMING SOON)
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Back button */}
+                  <button
+                    onClick={() => {
+                      handleModeChange(null);
+                      setTimeout(() => {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }, 50);
+                    }}
+                    className="w-full py-4 px-6 rounded-lg font-bold text-base transition-all transform hover:scale-105 shadow-lg bg-purple-600 text-gray-300 border-2 border-gray-300 hover:bg-purple-700 mt-6"
+                  >
+                    ← BACK TO TRAINING
+                  </button>
+                </>
+              );
+            })()}
+
             {/* HISTORY VIEW */}
             {currentMode === 'history' && (
               <>
@@ -1009,7 +1347,7 @@
                 {/* Back button */}
                 <button
                   onClick={() => {
-                    handleModeChange('double-in');
+                    handleModeChange(null);
                     setTimeout(() => {
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }, 50);
@@ -1068,14 +1406,20 @@
               </div>
             )}
 
-            {/* HISTORY BUTTON - Now at bottom, more prominent */}
-            {currentMode !== 'history' && (
-              <div className="mb-8">
+            {/* INSIGHTS & HISTORY BUTTONS - Now at bottom, side by side */}
+            {currentMode !== 'history' && currentMode !== 'insights' && (
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                <button
+                  onClick={() => handleModeChange('insights')}
+                  className="w-full py-4 px-6 rounded-lg font-bold text-base transition-all transform hover:scale-105 shadow-lg bg-purple-600 text-gray-300 border-2 border-gray-300 hover:bg-purple-700"
+                >
+                  💡 INSIGHTS
+                </button>
                 <button
                   onClick={() => handleModeChange('history')}
                   className="w-full py-4 px-6 rounded-lg font-bold text-base transition-all transform hover:scale-105 shadow-lg bg-purple-600 text-gray-300 border-2 border-gray-300 hover:bg-purple-700"
                 >
-                  📊 VIEW TRAINING HISTORY
+                  📊 HISTORY
                 </button>
               </div>
             )}
