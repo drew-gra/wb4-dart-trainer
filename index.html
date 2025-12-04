@@ -29,114 +29,150 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useContext, useCallback, useMemo, createContext } = React;
+    const { useState, useEffect, useContext, useCallback, useMemo, createContext, Fragment, useRef } = React;
 
     // ============================================================================
-    // WB4 DART TRAINER - SCALABLE ARCHITECTURE WITH FIXES
+    // WB4 DART TRAINER - WITH CRICKET MODE
     // ============================================================================
 
-    // ============================================================================
-    // SECTION 1: CONFIGURATION & CONSTANTS
-    // ============================================================================
-    
-    const CONFIG = {
-      MAX_SESSIONS: 20,
-      STORAGE_KEY: 'wb4UnifiedSessionHistory',
-      PRIORITY_DOUBLES: [16, 20, 8, 12],
-      CRICKET_NUMBERS: [15, 16, 17, 18, 19, 20, 'Bull'],
-      CRICKET_WEIGHTS: { 15: 1, 16: 1, 17: 1, 18: 1, 19: 1, 20: 1, 'Bull': 0.2 }
-    };
+    // CUSTOM HOOK: Session Manager
+    const useSessionManager = () => {
+      const [sessions, setSessions] = useState([]);
 
-    const MODES = {
-      DOUBLE_IN: 'double-in',
-      DOUBLE_OUT: 'double-out', 
-      CRICKET: 'cricket',
-      HISTORY: 'history'
-    };
-
-    // ============================================================================
-    // SECTION 2: REACT CONTEXT (FIX #1)
-    // ============================================================================
-    
-    // This replaces prop drilling. Modes can now useContext(SessionContext) 
-    // to access session management functions directly.
-    const SessionContext = createContext();
-
-    const useSession = () => {
-      const context = useContext(SessionContext);
-      if (!context) {
-        throw new Error('useSession must be used within SessionProvider');
-      }
-      return context;
-    };
-
-    // ============================================================================
-    // SECTION 3: SHARED SERVICES
-    // ============================================================================
-    
-    const StorageService = {
-      save: (key, data) => {
-        try {
-          localStorage.setItem(key, JSON.stringify(data));
-          return true;
-        } catch (e) {
-          console.error('Storage error:', e);
-          return false;
+      useEffect(() => {
+        const saved = localStorage.getItem('wb4UnifiedSessionHistory');
+        if (saved) {
+          try {
+            setSessions(JSON.parse(saved));
+          } catch (e) {
+            console.error('Error loading sessions:', e);
+          }
         }
-      },
-      
-      load: (key) => {
-        try {
-          const data = localStorage.getItem(key);
-          return data ? JSON.parse(data) : null;
-        } catch (e) {
-          console.error('Storage error:', e);
-          return null;
-        }
-      },
-      
-      saveSessions: (sessions) => {
-        return StorageService.save(CONFIG.STORAGE_KEY, sessions);
-      },
-      
-      loadSessions: () => {
-        return StorageService.load(CONFIG.STORAGE_KEY) || [];
-      }
+      }, []);
+
+      const addSession = (sessionData) => {
+        setSessions(prev => {
+          const updated = [sessionData, ...prev].slice(0, 100);
+          localStorage.setItem('wb4UnifiedSessionHistory', JSON.stringify(updated));
+          return updated;
+        });
+      };
+
+      const clearSessions = () => {
+        setSessions([]);
+        localStorage.removeItem('wb4UnifiedSessionHistory');
+      };
+
+      return { sessions, addSession, clearSessions };
     };
 
-    const StatsCalculator = {
-      basic: (attempts) => {
+    // MAIN COMPONENT
+    const WB4DartTrainer = () => {
+      const [currentMode, setCurrentMode] = useState('double-in');
+      const [saveStatus, setSaveStatus] = useState('');
+      const [confirmClear, setConfirmClear] = useState(false);
+      const { sessions, addSession, clearSessions } = useSessionManager();
+      const contentRef = useRef(null);
+      const isInitialMount = useRef(true);
+
+      const [diAttempts, setDiAttempts] = useState([]);
+      const [diSessionStart, setDiSessionStart] = useState(null);
+      const [diScoreInput, setDiScoreInput] = useState('');
+
+      const [doAttempts, setDoAttempts] = useState([]);
+      const [doSessionStart, setDoSessionStart] = useState(null);
+      const [doCurrentTarget, setDoCurrentTarget] = useState(null);
+      const [doConsecutiveFails, setDoConsecutiveFails] = useState(0);
+
+      const [tpAttempts, setTpAttempts] = useState([]);
+      const [tpSessionStart, setTpSessionStart] = useState(null);
+      const [tpCurrentTarget, setTpCurrentTarget] = useState(null);
+
+      // Cricket mode state
+      const [ckHits, setCkHits] = useState({ 20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, Bull: 0 });
+      const [ckTotalThrows, setCkTotalThrows] = useState(0);
+      const [ckMissCount, setCkMissCount] = useState(0);
+      const [ckGameStart, setCkGameStart] = useState(null);
+      const [ckCompletedGames, setCkCompletedGames] = useState([]);
+      const [ckPendingSelections, setCkPendingSelections] = useState([]);
+
+      const PRIORITY_DOUBLES = [16, 20, 8, 12];
+      const TRIPLES_NUMBERS = [15, 16, 17, 18, 19, 20, 'Bull'];
+      const CRICKET_WEIGHTS = { 15: 1, 16: 1, 17: 1, 18: 1, 19: 1, 20: 1, 'Bull': 0.2 };
+
+      // MODES CONFIGURATION - Only training modes, History moved to bottom
+      const TRAINING_MODES = [
+        { id: 'double-in', label: 'DOUBLE-IN' },
+        { id: 'double-out', label: 'DOUBLE-OUT' },
+        { id: 'triples', label: 'TRIPLES' },
+        { id: 'cricket', label: 'CRICKET' }
+      ];
+
+      // TRACKING HELPER
+      const trackEvent = (eventName, props = {}) => {
+        if (window.plausible) {
+          window.plausible(eventName, { props });
+        }
+      };
+
+      const handleModeChange = (mode) => {
+        setCurrentMode(mode);
+        trackEvent('Mode Changed', { mode });
+      };
+
+      // Scroll to content when mode changes (but not on initial load or when going to History)
+      useEffect(() => {
+        if (isInitialMount.current) {
+          isInitialMount.current = false;
+          return;
+        }
+        
+        // Scroll to top for History mode
+        if (currentMode === 'history') {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+        
+        if (contentRef.current) {
+          contentRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, [currentMode]);
+
+      const showStatus = (msg, timeout = 2000) => {
+        setSaveStatus(msg);
+        setTimeout(() => setSaveStatus(''), timeout);
+      };
+
+      const calculateStats = (attempts) => {
         const total = attempts.length;
         const successes = attempts.filter(a => a.outcome === 'success').length;
         const rate = total > 0 ? Math.round((successes / total) * 100) : 0;
         return { total, successes, failures: total - successes, successRate: rate };
-      },
-      
-      cricket: (attempts) => {
+      };
+
+      const calculateTriplesStats = (attempts) => {
         const total = attempts.length;
         const totalRounds = attempts.reduce((sum, a) => sum + (a.rounds || 0), 0);
         const avg = total > 0 ? (totalRounds / total).toFixed(2) : 0;
         return { total, totalRounds, avgRounds: avg };
-      },
-      
-      doubleIn: (attempts) => {
-        const stats = StatsCalculator.basic(attempts);
-        const scores = attempts.filter(a => a.outcome === 'success' && a.score).map(a => a.score);
-        const totalScore = scores.reduce((sum, s) => sum + s, 0);
-        const expectedValue = attempts.length > 0 ? (totalScore / attempts.length).toFixed(1) : 0;
-        return { ...stats, expectedValue: parseFloat(expectedValue) };
-      }
-    };
+      };
 
-    const TargetGenerator = {
-      doubleOut: (consecutiveFails) => {
+      const calculateCricketStats = (attempts) => {
+        const total = attempts.length;
+        const totalThrows = attempts.reduce((sum, a) => sum + (a.throws || 0), 0);
+        const avgThrows = total > 0 ? (totalThrows / total).toFixed(1) : 0;
+        const bestGame = total > 0 ? Math.min(...attempts.map(a => a.throws)) : 0;
+        return { total, totalThrows, avgThrows, bestGame };
+      };
+
+      const generateDoubleOutTarget = () => {
         const weights = {};
         for (let i = 1; i <= 20; i++) {
-          weights[i] = CONFIG.PRIORITY_DOUBLES.includes(i) ? 1.75 : 1;
+          weights[i] = PRIORITY_DOUBLES.includes(i) ? 1.75 : 1;
         }
-        if (consecutiveFails >= 4) {
-          const bonus = Math.floor((consecutiveFails - 3) * 2);
-          CONFIG.PRIORITY_DOUBLES.forEach(n => weights[n] += bonus);
+        if (doConsecutiveFails >= 4) {
+          const bonus = Math.floor((doConsecutiveFails - 3) * 2);
+          PRIORITY_DOUBLES.forEach(n => weights[n] += bonus);
         }
         const total = Object.values(weights).reduce((sum, w) => sum + w, 0);
         let rand = Math.random() * total;
@@ -145,689 +181,918 @@
           if (rand <= 0) return parseInt(num);
         }
         return 20;
-      },
-      
-      cricket: () => {
-        const total = Object.values(CONFIG.CRICKET_WEIGHTS).reduce((sum, w) => sum + w, 0);
-        let rand = Math.random() * total;
-        for (const [num, weight] of Object.entries(CONFIG.CRICKET_WEIGHTS)) {
-          rand -= weight;
-          if (rand <= 0) return num === 'Bull' ? 'Bull' : parseInt(num);
-        }
-        return 20;
-      }
-    };
+      };
 
-    const Analytics = {
-      track: (eventName, props = {}) => {
-        try {
-          if (window.plausible) {
-            window.plausible(eventName, { props });
-          }
-        } catch (e) {
-          console.error('Analytics error:', e);
-        }
-      }
-    };
-
-    // ============================================================================
-    // SECTION 4: CUSTOM HOOK - useTrainingSession (FIX #3)
-    // ============================================================================
-    
-    // This hook extracts the common pattern shared by all three training modes:
-    // - Initialize state (attempts, sessionStart, currentTarget/score)
-    // - Record an attempt
-    // - Save the session
-    // - Calculate stats
-    //
-    // Instead of duplicating this logic in 3 components, it's here once.
-    // When you add a new mode, you use this hook instead of writing 150 lines of boilerplate.
-
-    const useTrainingSession = ({ 
-      targetGenerator, 
-      statsCalculator, 
-      mode,
-      buildSessionData 
-    }) => {
-      const session = useSession(); // Get context
-      const [attempts, setAttempts] = useState([]);
-      const [sessionStart, setSessionStart] = useState(null);
-      const [currentTarget, setCurrentTarget] = useState(null);
-      const [consecutiveFails, setConsecutiveFails] = useState(0);
-      
-      // Initialize target on mount
-      useEffect(() => {
-        if (!currentTarget && targetGenerator) {
-          setCurrentTarget(targetGenerator(0));
-        }
-      }, []);
-      
-      const recordAttempt = useCallback((attemptData) => {
+      const recordDoubleOut = (outcome) => {
         const now = new Date();
-        if (attempts.length === 0) setSessionStart(now);
-        
-        const attempt = { ...attemptData, timestamp: now.toLocaleTimeString() };
-        setAttempts(prev => [attempt, ...prev]);
-        
-        Analytics.track('Attempt Recorded', { 
-          mode,
-          ...attemptData
-        });
-        
-        // Update consecutive fails for modes that track it (double-out)
-        if (attemptData.outcome !== undefined) {
-          const newFails = attemptData.outcome === 'success' ? 0 : consecutiveFails + 1;
-          setConsecutiveFails(newFails);
-          
-          // Regenerate target if target generator uses consecutive fails
-          if (targetGenerator) {
-            setCurrentTarget(targetGenerator(newFails));
-          }
-        } else {
-          // For cricket mode, just generate next target
-          if (targetGenerator) {
-            setCurrentTarget(targetGenerator());
-          }
-        }
-        
-        session.showStatus('💾 Saved', 1000);
-      }, [attempts.length, consecutiveFails, targetGenerator, mode, session]);
-      
-      const saveSession = useCallback(() => {
-        if (attempts.length === 0) return;
-        
-        const stats = statsCalculator(attempts);
-        const duration = Math.round((new Date() - sessionStart) / 60000);
-        
-        const sessionData = buildSessionData({
-          stats,
-          duration,
-          startTime: sessionStart,
-          mode
-        });
-        
-        session.addSession(sessionData);
-        
-        Analytics.track('Training Session Completed', {
-          mode,
-          attempts: stats.total,
-          duration
-        });
-        
-        // Reset state
-        setAttempts([]);
-        setSessionStart(null);
-        setConsecutiveFails(0);
-        if (targetGenerator) {
-          setCurrentTarget(targetGenerator(0));
-        }
-        session.showStatus('📊 Session saved', 1500);
-      }, [attempts.length, sessionStart, statsCalculator, buildSessionData, targetGenerator, mode, session]);
-      
-      const stats = statsCalculator(attempts);
-      
-      return {
-        attempts,
-        currentTarget,
-        setCurrentTarget,
-        consecutiveFails,
-        recordAttempt,
-        saveSession,
-        stats,
-        sessionStart
-      };
-    };
+        if (doAttempts.length === 0) setDoSessionStart(now);
 
-    // ============================================================================
-    // SECTION 5: SHARED UI COMPONENTS
-    // ============================================================================
-    
-    const UI = {
-      goldGradient: {
-        background: 'linear-gradient(45deg, #ffd700, #ffed4a)',
-        WebkitBackgroundClip: 'text',
-        WebkitTextFillColor: 'transparent'
-      },
-      
-      btnStyle: "font-black py-4 px-4 rounded-lg text-lg transition-all transform hover:scale-105 shadow-lg",
-      
-      Button: ({ onClick, disabled, variant = 'default', children, className = '' }) => {
-        const variants = {
-          default: 'text-white border-2 border-gray-600',
-          success: 'bg-green-600 text-white',
-          error: 'bg-red-600 text-white', 
-          primary: 'bg-blue-600 text-white'
+        const attempt = {
+          number: doCurrentTarget,
+          outcome,
+          timestamp: now.toLocaleTimeString()
         };
-        
-        return (
-          <button 
-            onClick={onClick}
-            disabled={disabled}
-            className={`${UI.btnStyle} ${variants[variant]} ${className} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-            style={{background: variant === 'default' ? 'linear-gradient(145deg, #374151, #1f2937)' : undefined}}
-          >
-            {children}
-          </button>
-        );
-      },
-      
-      StatsDisplay: ({ stats, mode }) => {
-        if (mode === MODES.CRICKET) {
-          return (
-            <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-              <h3 className="text-lg font-bold mb-3 text-pink-400">📊 STATS</h3>
-              <div className="grid grid-cols-2 gap-4 text-center">
-                <div><div className="text-2xl font-bold text-yellow-400">{stats.total}</div><div className="text-sm text-gray-300 font-medium">TOTAL ATTEMPTS</div></div>
-                <div><div className="text-2xl font-bold" style={UI.goldGradient}>{stats.avgRounds}</div><div className="text-sm text-gray-300 font-medium">AVG ROUNDS</div></div>
-              </div>
-            </div>
-          );
-        }
-        
-        return (
-          <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-            <h3 className="text-lg font-bold mb-3 text-pink-400">📊 STATS</h3>
-            <div className="grid grid-cols-2 gap-4 text-center">
-              <div><div className="text-2xl font-bold text-yellow-400">{stats.total}</div><div className="text-sm text-gray-300 font-medium">TOTAL ATTEMPTS</div></div>
-              <div><div className="text-2xl font-bold" style={UI.goldGradient}>{stats.successRate}%</div><div className="text-sm text-gray-300 font-medium">SUCCESS RATE</div></div>
-              <div><div className="text-2xl font-bold text-green-400">{stats.successes}</div><div className="text-sm text-gray-300 font-medium">{mode === MODES.DOUBLE_OUT ? 'GOT OUT' : 'GOT IN'}</div></div>
-              <div><div className="text-2xl font-bold text-red-400">{stats.failures}</div><div className="text-sm text-gray-300 font-medium">MISS</div></div>
-            </div>
-          </div>
-        );
-      }
-    };
 
-    // ============================================================================
-    // SECTION 6: MODE COMPONENTS (USING FIX #3)
-    // ============================================================================
-    
-    // DOUBLE-IN MODE
-    const DoubleInMode = () => {
-      const session = useSession();
-      const [scoreInput, setScoreInput] = useState('');
-      
-      const { attempts, recordAttempt, saveSession, stats } = useTrainingSession({
-        targetGenerator: null, // Double-in doesn't use target generator
-        statsCalculator: StatsCalculator.doubleIn,
-        mode: MODES.DOUBLE_IN,
-        buildSessionData: ({ stats, duration, startTime }) => ({
-          id: Date.now(),
-          mode: MODES.DOUBLE_IN,
-          startTime: startTime.toISOString(),
-          endTime: new Date().toISOString(),
-          duration,
-          totalAttempts: stats.total,
-          successRate: stats.successRate,
-          successes: stats.successes,
-          failures: stats.failures,
-          expectedValue: stats.expectedValue
-        })
-      });
-      
-      const handleRecordAttempt = (outcome) => {
-        let score = null;
-        if (outcome === 'success' && scoreInput) {
-          const val = parseInt(scoreInput);
-          if (val >= 2 && val <= 170) {
-            score = val;
-            setScoreInput('');
-            Analytics.track('Score Entered', { score: val, mode: MODES.DOUBLE_IN });
-          } else {
-            session.showStatus('⚠️ Score must be 2-170', 2000);
-            return;
-          }
-        }
-        
-        recordAttempt({ outcome, score });
+        setDoAttempts(prev => [attempt, ...prev]);
+        trackEvent('Attempt Recorded', { mode: 'double-out', outcome, target: doCurrentTarget });
+        setDoConsecutiveFails(outcome === 'success' ? 0 : doConsecutiveFails + 1);
+        setDoCurrentTarget(generateDoubleOutTarget());
+        showStatus('💾 Saved', 1000);
       };
-      
-      return (
-        <>
-          <div className="bg-gray-900 rounded-lg p-8 text-center mb-6 shadow-2xl border-2 border-yellow-500" 
-               style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
-            <p className="text-lg mb-4 text-pink-400 font-semibold">WHAT'D YOU HIT?</p>
-            <input
-              type="number"
-              value={scoreInput}
-              onChange={(e) => setScoreInput(e.target.value)}
-              className="text-3xl font-bold text-center bg-gray-800 text-yellow-400 rounded p-3 w-32 border-2 border-yellow-500 focus:border-yellow-300 focus:outline-none"
-              min="2"
-              max="170"
-              inputMode="numeric"
-            />
-            <p className="text-gray-300 text-sm mt-4">You have three darts to get in.</p>
-          </div>
-          
-          <div className="grid grid-cols-3 gap-3 mb-6">
-            <UI.Button onClick={() => handleRecordAttempt('success')}>
-              <div className="text-lg mb-1">✅</div>
-              <div className="text-xs font-bold">GOT IN!</div>
-            </UI.Button>
-            <UI.Button onClick={() => handleRecordAttempt('fail')}>
-              <div className="text-lg mb-1">❌</div>
-              <div className="text-xs font-bold">MISSED</div>
-            </UI.Button>
-            <UI.Button onClick={saveSession} disabled={attempts.length === 0}>
-              <div className="text-lg mb-1">💾</div>
-              <div className="text-xs font-bold">SAVE</div>
-            </UI.Button>
-          </div>
-          
-          <UI.StatsDisplay stats={stats} mode={MODES.DOUBLE_IN} />
-          
-          {attempts.length > 0 && (
-            <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-              <h3 className="text-lg font-bold mb-3 text-pink-400">📝 RECENT INS</h3>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {attempts.slice(0, 10).map((a, i) => (
-                  <div key={i} className="flex justify-between items-center text-sm bg-gray-800 p-2 rounded">
-                    <span className="text-yellow-400 font-semibold">
-                      {a.outcome === 'success' && a.score ? `Score: ${a.score}` : 'DOUBLE IN'}
-                    </span>
-                    <span className={`font-semibold ${a.outcome === 'success' ? 'text-green-400' : 'text-red-400'}`}>
-                      {a.outcome === 'success' ? '✅ GOT IN' : '❌ MISSED'}
-                    </span>
-                    <span className="text-gray-400 text-xs">{a.timestamp}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      );
-    };
 
-    // DOUBLE-OUT MODE
-    const DoubleOutMode = () => {
-      const { attempts, currentTarget, setCurrentTarget, consecutiveFails, recordAttempt, saveSession, stats } = useTrainingSession({
-        targetGenerator: TargetGenerator.doubleOut,
-        statsCalculator: StatsCalculator.basic,
-        mode: MODES.DOUBLE_OUT,
-        buildSessionData: ({ stats, duration, startTime }) => ({
+      const saveDoubleOutSession = () => {
+        if (doAttempts.length === 0) return;
+        
+        const stats = calculateStats(doAttempts);
+        const duration = Math.round((new Date() - doSessionStart) / 60000);
+        
+        addSession({
           id: Date.now(),
-          mode: MODES.DOUBLE_OUT,
-          startTime: startTime.toISOString(),
+          mode: 'double-out',
+          startTime: doSessionStart.toISOString(),
           endTime: new Date().toISOString(),
           duration,
           totalAttempts: stats.total,
           successRate: stats.successRate,
           successes: stats.successes,
           failures: stats.failures
-        })
-      });
-      
-      return (
-        <>
-          <div className="bg-gray-900 rounded-lg p-8 text-center mb-6 shadow-2xl border-2 border-yellow-500" 
-               style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
-            <p className="text-lg mb-2 text-pink-400 font-semibold">TARGET DOUBLE:</p>
-            <div className="text-6xl font-black mb-4" style={UI.goldGradient}>
-              {currentTarget ? `D${currentTarget}` : '...'}
-            </div>
-            <p className="text-gray-300 text-sm font-medium">You have three darts to get out.</p>
-          </div>
-          
-          <div className="grid grid-cols-4 gap-2 mb-6">
-            <UI.Button onClick={() => recordAttempt({ outcome: 'success' })} disabled={!currentTarget}>
-              <div className="text-lg mb-1">✅</div>
-              <div className="text-xs font-bold">HIT IT!</div>
-            </UI.Button>
-            <UI.Button onClick={() => recordAttempt({ outcome: 'fail' })} disabled={!currentTarget}>
-              <div className="text-lg mb-1">❌</div>
-              <div className="text-xs font-bold">MISSED</div>
-            </UI.Button>
-            <UI.Button onClick={() => setCurrentTarget(TargetGenerator.doubleOut(consecutiveFails))} disabled={!currentTarget}>
-              <div className="text-lg mb-1">➡️</div>
-              <div className="text-xs font-bold">SKIP</div>
-            </UI.Button>
-            <UI.Button onClick={saveSession} disabled={attempts.length === 0}>
-              <div className="text-lg mb-1">💾</div>
-              <div className="text-xs font-bold">SAVE</div>
-            </UI.Button>
-          </div>
-          
-          <UI.StatsDisplay stats={stats} mode={MODES.DOUBLE_OUT} />
-          
-          {attempts.length > 0 && (
-            <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-              <h3 className="text-lg font-bold mb-3 text-pink-400">📝 RECENT ATTEMPTS</h3>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {attempts.slice(0, 10).map((a, i) => (
-                  <div key={i} className="flex justify-between items-center text-sm bg-gray-800 p-2 rounded">
-                    <span className="text-yellow-400 font-semibold">D{a.number}</span>
-                    <span className={`font-semibold ${a.outcome === 'success' ? 'text-green-400' : 'text-red-400'}`}>
-                      {a.outcome === 'success' ? '✅' : '❌'}
-                    </span>
-                    <span className="text-gray-400 text-xs">{a.timestamp}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      );
-    };
+        });
 
-    // CRICKET MODE
-    const CricketMode = () => {
-      const { attempts, currentTarget, recordAttempt, saveSession, stats } = useTrainingSession({
-        targetGenerator: TargetGenerator.cricket,
-        statsCalculator: StatsCalculator.cricket,
-        mode: MODES.CRICKET,
-        buildSessionData: ({ stats, duration, startTime }) => ({
+        trackEvent('Training Session Completed', {
+          mode: 'double-out',
+          attempts: stats.total,
+          successRate: stats.successRate,
+          duration: duration
+        });
+
+        setDoAttempts([]);
+        setDoSessionStart(null);
+        setDoConsecutiveFails(0);
+        setDoCurrentTarget(generateDoubleOutTarget());
+        showStatus('📊 Session saved', 1500);
+      };
+
+      const recordDoubleIn = (outcome) => {
+        const now = new Date();
+        if (diAttempts.length === 0) setDiSessionStart(now);
+
+        let score = null;
+        if (outcome === 'success' && diScoreInput) {
+          const val = parseInt(diScoreInput);
+          if (val >= 2 && val <= 170) {
+            score = val;
+            setDiScoreInput('');
+            trackEvent('Score Entered', { score: val, mode: 'double-in' });
+          } else {
+            showStatus('⚠️ Score must be 2-170', 2000);
+            return;
+          }
+        }
+
+        const attempt = { outcome, score, timestamp: now.toLocaleTimeString() };
+        setDiAttempts(prev => [attempt, ...prev]);
+        trackEvent('Attempt Recorded', { mode: 'double-in', outcome });
+        showStatus('💾 Saved', 1000);
+      };
+
+      const saveDoubleInSession = () => {
+        if (diAttempts.length === 0) return;
+
+        const stats = calculateStats(diAttempts);
+        const duration = Math.round((new Date() - diSessionStart) / 60000);
+        const scores = diAttempts.filter(a => a.outcome === 'success' && a.score).map(a => a.score);
+        const totalScore = scores.reduce((sum, s) => sum + s, 0);
+        const expectedValue = diAttempts.length > 0 ? (totalScore / diAttempts.length).toFixed(1) : 0;
+
+        addSession({
           id: Date.now(),
-          mode: MODES.CRICKET,
-          startTime: startTime.toISOString(),
+          mode: 'double-in',
+          startTime: diSessionStart.toISOString(),
+          endTime: new Date().toISOString(),
+          duration,
+          totalAttempts: stats.total,
+          successRate: stats.successRate,
+          successes: stats.successes,
+          failures: stats.failures,
+          expectedValue: parseFloat(expectedValue)
+        });
+
+        trackEvent('Training Session Completed', {
+          mode: 'double-in',
+          attempts: stats.total,
+          successRate: stats.successRate,
+          duration: duration
+        });
+
+        setDiAttempts([]);
+        setDiSessionStart(null);
+        showStatus('📊 Session saved', 1500);
+      };
+
+      const generateTriplesTarget = () => {
+        const total = Object.values(CRICKET_WEIGHTS).reduce((sum, w) => sum + w, 0);
+        let rand = Math.random() * total;
+        for (const [num, weight] of Object.entries(CRICKET_WEIGHTS)) {
+          rand -= weight;
+          if (rand <= 0) return num === 'Bull' ? 'Bull' : parseInt(num);
+        }
+        return 20;
+      };
+
+      const recordTriples = (rounds) => {
+        const now = new Date();
+        if (tpAttempts.length === 0) setTpSessionStart(now);
+
+        const attempt = {
+          number: tpCurrentTarget,
+          rounds,
+          timestamp: now.toLocaleTimeString()
+        };
+
+        setTpAttempts(prev => [attempt, ...prev]);
+        trackEvent('Attempt Recorded', { mode: 'triples', target: tpCurrentTarget, rounds });
+        setTpCurrentTarget(generateTriplesTarget());
+        showStatus('💾 Saved', 1000);
+      };
+
+      const saveTriplesSession = () => {
+        if (tpAttempts.length === 0) return;
+
+        const stats = calculateTriplesStats(tpAttempts);
+        const duration = Math.round((new Date() - tpSessionStart) / 60000);
+
+        addSession({
+          id: Date.now(),
+          mode: 'triples',
+          startTime: tpSessionStart.toISOString(),
           endTime: new Date().toISOString(),
           duration,
           totalAttempts: stats.total,
           totalRounds: stats.totalRounds,
           avgRounds: stats.avgRounds
-        })
-      });
-      
-      return (
-        <>
-          <div className="bg-gray-900 rounded-lg p-8 text-center mb-6 shadow-2xl border-2 border-yellow-500" 
-               style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
-            <p className="text-lg mb-2 text-pink-400 font-semibold">TARGET NUMBER:</p>
-            <div className="text-6xl font-black mb-4" style={UI.goldGradient}>
-              {currentTarget || '...'}
-            </div>
-            <p className="text-gray-300 text-sm font-medium">Hit as many as you can with three darts.</p>
-          </div>
-          
-          {currentTarget === 'Bull' ? (
-            <>
-              <div className="grid grid-cols-3 gap-2 mb-2">
-                <UI.Button onClick={() => recordAttempt({ rounds: 0 })} className="text-xs py-3">MISS</UI.Button>
-                {[1, 2].map(n => (
-                  <UI.Button key={n} onClick={() => recordAttempt({ rounds: n })} className="text-xs py-3">C{n}</UI.Button>
-                ))}
-              </div>
-              <div className="grid grid-cols-4 gap-2 mb-6">
-                {[3, 4, 5, 6].map(n => (
-                  <UI.Button key={n} onClick={() => recordAttempt({ rounds: n })} className="text-xs py-3">C{n}</UI.Button>
-                ))}
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="grid grid-cols-5 gap-2 mb-2">
-                <UI.Button onClick={() => recordAttempt({ rounds: 0 })} className="text-xs py-3">MISS</UI.Button>
-                {[1, 2, 3, 4].map(n => (
-                  <UI.Button key={n} onClick={() => recordAttempt({ rounds: n })} className="text-xs py-3">R{n}</UI.Button>
-                ))}
-              </div>
-              <div className="grid grid-cols-5 gap-2 mb-6">
-                {[5, 6, 7, 8, 9].map(n => (
-                  <UI.Button key={n} onClick={() => recordAttempt({ rounds: n })} className="text-xs py-3">R{n}</UI.Button>
-                ))}
-              </div>
-            </>
-          )}
-          
-          <UI.Button onClick={saveSession} disabled={attempts.length === 0} className="w-full">
-            <div className="text-lg mr-2">💾</div>
-            <div className="text-xs font-bold">SAVE SESSION</div>
-          </UI.Button>
-          
-          <UI.StatsDisplay stats={stats} mode={MODES.CRICKET} />
-          
-          {attempts.length > 0 && (
-            <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-              <h3 className="text-lg font-bold mb-3 text-pink-400">📝 RECENT THROWS</h3>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {attempts.slice(0, 10).map((a, i) => (
-                  <div key={i} className="flex justify-between items-center text-sm bg-gray-800 p-2 rounded">
-                    <span className="text-yellow-400 font-semibold">{a.number}</span>
-                    <span className="text-blue-400 font-semibold">
-                      {a.rounds === 0 ? '❌ MISS' : `✅ ${a.number === 'Bull' ? 'C' : 'R'}${a.rounds}`}
-                    </span>
-                    <span className="text-gray-400 text-xs">{a.timestamp}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      );
-    };
+        });
 
-    // HISTORY MODE (Doesn't use useTrainingSession hook - different pattern)
-    const HistoryMode = ({ sessions }) => {
-      const session = useSession();
-      const [confirmClear, setConfirmClear] = useState(false);
-      
-      return (
-        <>
-          <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-            <h3 className="text-lg font-bold mb-3 text-pink-400">📊 OVERALL STATS</h3>
-            <div className="grid grid-cols-2 gap-4 text-center">
-              <div><div className="text-2xl font-bold text-yellow-400">{sessions.length}</div><div className="text-sm text-gray-300 font-medium">TOTAL SESSIONS</div></div>
-              <div><div className="text-2xl font-bold text-blue-400">{sessions.filter(s => s.mode === MODES.DOUBLE_IN).length}</div><div className="text-sm text-gray-300 font-medium">DOUBLE-IN</div></div>
-              <div><div className="text-2xl font-bold text-green-400">{sessions.filter(s => s.mode === MODES.DOUBLE_OUT).length}</div><div className="text-sm text-gray-300 font-medium">DOUBLE-OUT</div></div>
-              <div><div className="text-2xl font-bold text-purple-400">{sessions.filter(s => s.mode === MODES.CRICKET).length}</div><div className="text-sm text-gray-300 font-medium">CRICKET</div></div>
-            </div>
-          </div>
-          
-          {sessions.length > 0 ? (
-            <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-              <h3 className="text-lg font-bold mb-3 text-pink-400">📈 SESSION HISTORY</h3>
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {sessions.map((s, idx) => {
-                  const colors = {
-                    [MODES.DOUBLE_IN]: 'bg-blue-600',
-                    [MODES.DOUBLE_OUT]: 'bg-green-600',
-                    [MODES.CRICKET]: 'bg-purple-600'
-                  };
-                  const labels = {
-                    [MODES.DOUBLE_IN]: 'DOUBLE-IN',
-                    [MODES.DOUBLE_OUT]: 'DOUBLE-OUT',
-                    [MODES.CRICKET]: 'CRICKET'
-                  };
-                  
-                  return (
-                    <div key={s.id} className="bg-gray-800 p-3 rounded">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className={`${colors[s.mode]} text-white text-xs font-bold px-2 py-1 rounded`}>{labels[s.mode]}</span>
-                            <span className="text-yellow-400 font-semibold text-sm">Session #{sessions.length - idx}</span>
-                          </div>
-                          <span className="text-gray-400 text-xs">{new Date(s.endTime).toLocaleDateString()} • {s.duration}min</span>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-white font-bold text-sm">{s.totalAttempts} attempts</div>
-                          {s.mode === MODES.CRICKET ? (
-                            <div className="text-sm text-blue-400 font-semibold">{s.avgRounds} avg rounds</div>
-                          ) : (
-                            <>
-                              <div className={`text-sm font-semibold ${s.successRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>{s.successRate}% success</div>
-                              {s.expectedValue && <div className="text-xs text-blue-400 font-medium">Avg in: {s.expectedValue}</div>}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="text-xs text-gray-500 mt-3">Your last {CONFIG.MAX_SESSIONS} sessions are saved. Use the same device to practice.</p>
-            </div>
-          ) : (
-            <div className="bg-gray-900 rounded-lg p-8 text-center mb-6 border border-gray-800">
-              <p className="text-gray-400 text-sm">No sessions yet. Complete a training session to see it here!</p>
-            </div>
-          )}
-          
-          <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-            <div className="flex items-start mb-3">
-              <input 
-                type="checkbox" 
-                id="confirmClear" 
-                checked={confirmClear} 
-                onChange={(e) => setConfirmClear(e.target.checked)} 
-                className="mt-1 mr-3 w-5 h-5 cursor-pointer" 
-              />
-              <label htmlFor="confirmClear" className="text-sm text-gray-300 cursor-pointer">
-                Delete all session history and start again.
-              </label>
-            </div>
-            <UI.Button 
-              onClick={() => {
-                if (confirmClear) {
-                  session.clearAll();
-                  setConfirmClear(false);
-                }
-              }} 
-              disabled={!confirmClear}
-              className="w-full bg-pink-600 hover:bg-pink-700 text-white"
-            >
-              🧹 CLEAR ALL PRACTICE DATA
-            </UI.Button>
-          </div>
-        </>
-      );
-    };
+        trackEvent('Training Session Completed', {
+          mode: 'triples',
+          attempts: stats.total,
+          avgRounds: stats.avgRounds,
+          duration: duration
+        });
 
-    // ============================================================================
-    // SECTION 7: MODE REGISTRY
-    // ============================================================================
-    
-    const MODE_REGISTRY = {
-      [MODES.DOUBLE_IN]: {
-        label: 'DOUBLE-IN',
-        component: DoubleInMode
-      },
-      [MODES.DOUBLE_OUT]: {
-        label: 'DOUBLE-OUT',
-        component: DoubleOutMode
-      },
-      [MODES.CRICKET]: {
-        label: 'CRICKET',
-        component: CricketMode
-      },
-      [MODES.HISTORY]: {
-        label: 'HISTORY',
-        component: HistoryMode
-      }
-    };
-
-    // ============================================================================
-    // SECTION 8: MAIN APP COMPONENT
-    // ============================================================================
-    
-    const WB4DartTrainer = () => {
-      const [currentMode, setCurrentMode] = useState(MODES.DOUBLE_IN);
-      const [sessions, setSessions] = useState([]);
-      const [saveStatus, setSaveStatus] = useState('');
-      const [refreshKey, setRefreshKey] = useState(0);
-      
-      // Load sessions on mount
-      useEffect(() => {
-        const loaded = StorageService.loadSessions();
-        setSessions(loaded);
-      }, []);
-      
-      // Session context value - this is what modes access via useSession()
-      const sessionContextValue = useMemo(() => ({
-        addSession: (sessionData) => {
-          setSessions(prev => {
-            const updated = [sessionData, ...prev].slice(0, CONFIG.MAX_SESSIONS);
-            StorageService.saveSessions(updated);
-            return updated;
-          });
-        },
-        
-        showStatus: (msg, timeout = 2000) => {
-          setSaveStatus(msg);
-          setTimeout(() => setSaveStatus(''), timeout);
-        },
-        
-        clearAll: () => {
-          setSessions([]);
-          StorageService.saveSessions([]);
-          setSaveStatus('🧹 All data cleared');
-          Analytics.track('Data Cleared');
-        }
-      }), []);
-      
-      const handleModeChange = (mode) => {
-        setCurrentMode(mode);
-        Analytics.track('Mode Changed', { mode });
+        setTpAttempts([]);
+        setTpSessionStart(null);
+        setTpCurrentTarget(generateTriplesTarget());
+        showStatus('📊 Session saved', 1500);
       };
+
+      // Cricket mode handlers
+      const baseNumbers = [20, 19, 18, 17, 16, 15, 'Bull'];
+      const totalHitsNeeded = 21;
+      const ckCurrentHits = Object.values(ckHits).reduce((sum, count) => sum + count, 0);
+      const ckIsComplete = ckCurrentHits >= totalHitsNeeded;
       
-      // Get the current mode component
-      const CurrentModeComponent = MODE_REGISTRY[currentMode]?.component;
-      
+      const ckNumbers = useMemo(() => {
+        const open = baseNumbers.filter(num => ckHits[num] < 3);
+        const closed = baseNumbers.filter(num => ckHits[num] >= 3);
+        return [...open, ...closed];
+      }, [ckHits]);
+
+      useEffect(() => {
+        if (ckIsComplete && ckGameStart && ckTotalThrows > 0) {
+          const now = new Date();
+          const game = {
+            throws: ckTotalThrows,
+            timestamp: now.toLocaleTimeString(),
+            date: now.toLocaleDateString()
+          };
+          
+          const newGames = [game, ...ckCompletedGames];
+          setCkCompletedGames(newGames);
+          
+          const duration = Math.round((now - ckGameStart) / 60000) || 1;
+          const missRate = ckTotalThrows > 0 ? Math.round((ckMissCount / ckTotalThrows) * 100) : 0;
+          
+          addSession({
+            id: Date.now(),
+            mode: 'cricket',
+            startTime: ckGameStart.toISOString(),
+            endTime: now.toISOString(),
+            duration,
+            throws: ckTotalThrows,
+            missRate: missRate
+          });
+          
+          showStatus('🎯 Game Complete! Starting new game...', 2000);
+          
+          setTimeout(() => {
+            setCkHits({ 20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, Bull: 0 });
+            setCkTotalThrows(0);
+            setCkMissCount(0);
+            setCkGameStart(null);
+            setCkPendingSelections([]);
+          }, 2000);
+        }
+      }, [ckIsComplete, ckGameStart, ckTotalThrows]);
+
+      const handleCricketPendingHit = (number, count) => {
+        if (ckPendingSelections.length >= 3) return;
+        const remainingHits = 3 - ckHits[number];
+        const actualHits = Math.min(count, remainingHits);
+        if (actualHits > 0) {
+          setCkPendingSelections(prev => [...prev, { number, count: actualHits, type: 'hit' }]);
+        }
+      };
+
+      const handleCricketPendingMiss = () => {
+        if (ckPendingSelections.length >= 3) return;
+        setCkPendingSelections(prev => [...prev, { type: 'miss' }]);
+      };
+
+      const handleCricketSubmit = () => {
+        if (ckPendingSelections.length === 0) return;
+        if (!ckGameStart) setCkGameStart(new Date());
+        
+        const newHits = { ...ckHits };
+        const missCount = ckPendingSelections.filter(s => s.type === 'miss').length;
+        
+        ckPendingSelections.forEach(selection => {
+          if (selection.type === 'hit') {
+            newHits[selection.number] = Math.min(3, newHits[selection.number] + selection.count);
+          }
+        });
+        
+        setCkHits(newHits);
+        setCkTotalThrows(prev => prev + ckPendingSelections.length);
+        setCkMissCount(prev => prev + missCount);
+        setCkPendingSelections([]);
+        showStatus('✓ Saved', 800);
+      };
+
+      const handleCricketClear = () => {
+        setCkPendingSelections([]);
+      };
+
+      const handleCricketNewGame = () => {
+        setCkHits({ 20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, Bull: 0 });
+        setCkTotalThrows(0);
+        setCkMissCount(0);
+        setCkGameStart(null);
+        setCkPendingSelections([]);
+        showStatus('🎯 New game started', 1000);
+      };
+
+      const ckGetRemainingHits = (num) => {
+        return Math.max(0, 3 - ckHits[num]);
+      };
+
+      const ckIsPending = (number, count) => {
+        return ckPendingSelections.some(s => s.type === 'hit' && s.number === number && s.count === count);
+      };
+
+      const ckIsMissPending = ckPendingSelections.some(s => s.type === 'miss');
+
+      useEffect(() => {
+        if (currentMode === 'double-out' && !doCurrentTarget) {
+          setDoCurrentTarget(generateDoubleOutTarget());
+        }
+        if (currentMode === 'triples' && !tpCurrentTarget) {
+          setTpCurrentTarget(generateTriplesTarget());
+        }
+      }, [currentMode, doCurrentTarget, tpCurrentTarget]);
+
+      const clearAllData = () => {
+        setDiAttempts([]);
+        setDiSessionStart(null);
+        setDoAttempts([]);
+        setDoSessionStart(null);
+        setDoConsecutiveFails(0);
+        setTpAttempts([]);
+        setTpSessionStart(null);
+        setCkHits({ 20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, Bull: 0 });
+        setCkTotalThrows(0);
+        setCkMissCount(0);
+        setCkGameStart(null);
+        setCkCompletedGames([]);
+        setCkPendingSelections([]);
+        clearSessions();
+        setConfirmClear(false);
+        showStatus('🧹 All data cleared');
+      };
+
+      const getCurrentAttempts = () => {
+        if (currentMode === 'double-in') return diAttempts;
+        if (currentMode === 'double-out') return doAttempts;
+        if (currentMode === 'triples') return tpAttempts;
+        return [];
+      };
+
+      const getCurrentStats = () => {
+        if (currentMode === 'double-in') return calculateStats(diAttempts);
+        if (currentMode === 'double-out') return calculateStats(doAttempts);
+        if (currentMode === 'triples') return calculateTriplesStats(tpAttempts);
+        if (currentMode === 'cricket') return calculateCricketStats(ckCompletedGames);
+        return { total: 0, successes: 0, failures: 0, successRate: 0 };
+      };
+
+      const goldGradient = {
+        background: 'linear-gradient(45deg, #ffd700, #ffed4a)',
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent'
+      };
+
+      const btnStyle = "font-black py-4 px-4 rounded-lg text-lg transition-all transform hover:scale-105 shadow-lg";
+
       return (
-        <SessionContext.Provider value={sessionContextValue}>
-          <div className="min-h-screen bg-black text-white p-4" style={{background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)'}}>
-            <div className="max-w-md mx-auto">
-              
-              {/* Header */}
-              <div className="text-center mb-6">
-                <h1 className="text-3xl font-bold mb-2" style={UI.goldGradient}>WB4 DART TRAINER</h1>
+        <div className="min-h-screen bg-black text-white p-4" style={{background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)'}}>
+          <div className="max-w-md mx-auto">
+            
+            {/* HEADER */}
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold mb-2" style={goldGradient}>WB4 DART TRAINER</h1>
+            </div>
+
+            {/* NEW MODE NAVIGATION - Cleaner tabs style */}
+            <div className="mb-8">
+              <div className="flex gap-1 bg-gray-900 p-1 rounded-lg border border-gray-800">
+                {TRAINING_MODES.map((mode) => (
+                  <button
+                    key={mode.id}
+                    onClick={() => handleModeChange(mode.id)}
+                    className={`flex-1 py-3 px-2 rounded-md text-xs font-bold transition-all duration-300 ${
+                      currentMode === mode.id 
+                        ? 'text-black shadow-lg transform scale-105' 
+                        : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                    style={currentMode === mode.id ? 
+                      {background: 'linear-gradient(45deg, #ffd700, #ffed4a)'} :
+                      {background: 'transparent'}
+                    }
+                  >
+                    {mode.label}
+                  </button>
+                ))}
               </div>
-              
-              {/* Mode Navigation */}
-              <div className="bg-gray-900 rounded-full p-2 mb-6 border border-gray-800">
-                <div className="grid grid-cols-4 gap-1">
-                  {Object.entries(MODE_REGISTRY).map(([mode, config]) => (
-                    <button
-                      key={mode}
-                      onClick={() => handleModeChange(mode)}
-                      className={`py-2 px-2 rounded-full text-xs font-bold transition-all duration-200 ${
-                        currentMode === mode 
-                          ? 'text-black border-2 border-yellow-400' 
-                          : 'text-gray-300 border-2 border-gray-600 hover:border-gray-500'
-                      }`}
-                      style={currentMode === mode ? 
-                        {background: 'linear-gradient(45deg, #ffd700, #ffed4a)', textShadow: '1px 1px 2px rgba(0,0,0,0.3)'} :
-                        {background: 'linear-gradient(145deg, #374151, #1f2937)'}
+            </div>
+
+            {/* Content scroll target */}
+            <div ref={contentRef}></div>
+
+            {/* DOUBLE-IN MODE */}
+            {currentMode === 'double-in' && (
+              <>
+                <div className="bg-gray-900 rounded-lg p-8 text-center mb-8 shadow-2xl border-2 border-yellow-500" 
+                     style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
+                  <div className="text-5xl font-black mb-6" style={goldGradient}>GET IN</div>
+                  <p className="text-gray-400 text-sm mb-6">Hit any double and enter your score.</p>
+                  <input
+                    type="number"
+                    value={diScoreInput}
+                    onChange={(e) => setDiScoreInput(e.target.value)}
+                    className="text-3xl font-bold text-center bg-gray-800 text-yellow-400 rounded p-3 w-32 border-2 border-yellow-500 focus:border-yellow-300 focus:outline-none"
+                    min="2"
+                    max="170"
+                    inputMode="numeric"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 mb-8">
+                  <button onClick={() => recordDoubleIn('success')} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
+                    <div className="text-lg mb-1">✅</div>
+                    <div className="text-xs font-bold">GOT IN!</div>
+                  </button>
+                  <button onClick={() => recordDoubleIn('fail')} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
+                    <div className="text-lg mb-1">❌</div>
+                    <div className="text-xs font-bold">MISSED</div>
+                  </button>
+                  <button onClick={saveDoubleInSession} disabled={diAttempts.length === 0} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
+                    <div className="text-lg mb-1">💾</div>
+                    <div className="text-xs font-bold">SAVE</div>
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* DOUBLE-OUT MODE */}
+            {currentMode === 'double-out' && (
+              <>
+                <div className="bg-gray-900 rounded-lg p-8 text-center mb-8 shadow-2xl border-2 border-yellow-500" 
+                     style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
+                  <div className="text-6xl font-black mb-4" style={goldGradient}>
+                    {doCurrentTarget ? `D${doCurrentTarget}` : '...'}
+                  </div>
+                  <p className="text-gray-400 text-sm">This is your out. You have three darts.</p>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2 mb-8">
+                  <button onClick={() => recordDoubleOut('success')} disabled={!doCurrentTarget} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
+                    <div className="text-lg mb-1">✅</div>
+                    <div className="text-xs font-bold">HIT IT!</div>
+                  </button>
+                  <button onClick={() => recordDoubleOut('fail')} disabled={!doCurrentTarget} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
+                    <div className="text-lg mb-1">❌</div>
+                    <div className="text-xs font-bold">MISSED</div>
+                  </button>
+                  <button onClick={() => setDoCurrentTarget(generateDoubleOutTarget())} disabled={!doCurrentTarget} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
+                    <div className="text-lg mb-1">➡️</div>
+                    <div className="text-xs font-bold">SKIP</div>
+                  </button>
+                  <button onClick={saveDoubleOutSession} disabled={doAttempts.length === 0} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
+                    <div className="text-lg mb-1">💾</div>
+                    <div className="text-xs font-bold">SAVE</div>
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* TRIPLES MODE */}
+            {currentMode === 'triples' && (
+              <>
+                <div className="bg-gray-900 rounded-lg p-8 text-center mb-8 shadow-2xl border-2 border-yellow-500" 
+                     style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
+                  <div className="text-6xl font-black mb-4" style={goldGradient}>
+                    {tpCurrentTarget || '...'}
+                  </div>
+                  <p className="text-gray-400 text-sm">Here's your target. Hit as many as you can.</p>
+                </div>
+
+                {tpCurrentTarget === 'Bull' ? (
+                  <>
+                    <div className="grid grid-cols-3 gap-2 mb-2">
+                      <button onClick={() => recordTriples(0)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>MISS</button>
+                      {[1, 2].map(n => (
+                        <button key={n} onClick={() => recordTriples(n)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>C{n}</button>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 mb-8">
+                      {[3, 4, 5, 6].map(n => (
+                        <button key={n} onClick={() => recordTriples(n)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>C{n}</button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-5 gap-2 mb-2">
+                      <button onClick={() => recordTriples(0)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>MISS</button>
+                      {[1, 2, 3, 4].map(n => (
+                        <button key={n} onClick={() => recordTriples(n)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>R{n}</button>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-5 gap-2 mb-8">
+                      {[5, 6, 7, 8, 9].map(n => (
+                        <button key={n} onClick={() => recordTriples(n)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>R{n}</button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <button onClick={saveTriplesSession} disabled={tpAttempts.length === 0} className={`w-full ${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex items-center justify-center mb-8`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
+                  <div className="text-lg mr-2">💾</div>
+                  <div className="text-xs font-bold">SAVE SESSION</div>
+                </button>
+              </>
+            )}
+
+            {/* CRICKET MODE */}
+            {currentMode === 'cricket' && (
+              <>
+                <div className="bg-gray-900 rounded-lg p-6 text-center mb-8 shadow-2xl border-2 border-yellow-500" 
+                     style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
+                  <div className="text-4xl font-black mb-4" style={goldGradient}>CLOSE EVERYTHING</div>
+                  <p className="text-gray-400 text-sm mb-2">You're playing Cricket with no scoring.</p>
+                  <div className={`text-sm font-bold h-5 ${ckPendingSelections.length >= 3 ? 'text-green-400' : ckPendingSelections.length > 0 ? 'text-blue-400' : 'text-transparent'}`}>
+                    {ckPendingSelections.length > 0 ? (
+                      <>
+                        This Round: {ckPendingSelections.length} dart{ckPendingSelections.length !== 1 ? 's' : ''} selected
+                        {ckPendingSelections.length >= 3 && ' - Ready to Submit!'}
+                      </>
+                    ) : (
+                      'Ready to throw'
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
+                  <div className="space-y-3">
+                    {ckNumbers.map((num, index) => {
+                      const remaining = ckGetRemainingHits(num);
+                      const isClosed = remaining === 0;
+                      const isLocked = ckPendingSelections.length >= 3;
+                      const closedCount = ckHits[num];
+                      
+                      // Find the first open number in priority order
+                      const priorityOrder = [20, 19, 18, 17, 16, 15, 'Bull'];
+                      const firstOpenNumber = priorityOrder.find(n => ckHits[n] < 3);
+                      const shouldShowMissSubmit = num === firstOpenNumber;
+                      
+                      if (num === 'Bull') {
+                        return (
+                          <Fragment key={num}>
+                            <div className="flex items-center gap-3">
+                              <div className="flex gap-3 flex-1">
+                                <button
+                                  onClick={() => handleCricketPendingHit('Bull', 1)}
+                                  disabled={isClosed || isLocked}
+                                  className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
+                                    isClosed || isLocked
+                                      ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+                                      : ckIsPending('Bull', 1)
+                                      ? 'bg-yellow-600 text-white border-yellow-500 scale-105 shadow-lg'
+                                      : 'bg-gray-800 text-yellow-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
+                                  }`}
+                                >
+                                  BULL
+                                </button>
+                                <button
+                                  onClick={() => handleCricketPendingHit('Bull', 2)}
+                                  disabled={isClosed || isLocked}
+                                  className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
+                                    isClosed || isLocked
+                                      ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+                                      : ckIsPending('Bull', 2)
+                                      ? 'bg-red-600 text-white border-red-500 scale-105 shadow-lg'
+                                      : 'bg-gray-800 text-red-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
+                                  }`}
+                                >
+                                  D-BULL
+                                </button>
+                              </div>
+                              <div className="flex gap-1.5 w-16 justify-between">
+                                {[0, 1, 2].map(idx => (
+                                  <span key={idx} className="text-xs">
+                                    {idx < closedCount ? '🎯' : '🔴'}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            
+                            {/* Miss/Submit after highest priority open number */}
+                            {shouldShowMissSubmit && (
+                              <div className="flex items-center gap-3">
+                                <div className="flex gap-3 flex-1">
+                                  <button
+                                    onClick={handleCricketPendingMiss}
+                                    disabled={isLocked}
+                                    className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
+                                      isLocked
+                                        ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+                                        : ckIsMissPending
+                                        ? 'bg-red-600 text-white border-red-500 scale-105 shadow-lg'
+                                        : 'bg-gray-800 text-red-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
+                                    }`}
+                                  >
+                                    ❌ MISS
+                                  </button>
+                                  <button
+                                    onClick={handleCricketSubmit}
+                                    disabled={ckPendingSelections.length === 0}
+                                    className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border flex flex-col items-center justify-center ${
+                                      ckPendingSelections.length === 0
+                                        ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed opacity-50'
+                                        : 'bg-green-600 text-white border-2 border-green-400 shadow-lg hover:scale-105'
+                                    }`}
+                                  >
+                                    <div>✓ SUBMIT</div>
+                                    <div className={`text-xs font-normal mt-0.5 ${ckPendingSelections.length === 0 ? 'invisible' : ''}`}>
+                                      ({ckPendingSelections.length})
+                                    </div>
+                                  </button>
+                                </div>
+                                <div className="w-16"></div>
+                              </div>
+                            )}
+                          </Fragment>
+                        );
                       }
-                    >
-                      {config.label}
-                    </button>
+                      
+                      return (
+                        <Fragment key={num}>
+                          <div className="flex items-center gap-3">
+                            <div className="flex gap-3 flex-1">
+                              <button
+                                onClick={() => handleCricketPendingHit(num, 1)}
+                                disabled={isClosed || isLocked}
+                                className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
+                                  isClosed || isLocked
+                                    ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+                                    : ckIsPending(num, 1)
+                                    ? 'bg-blue-600 text-white border-blue-500 scale-105 shadow-lg'
+                                    : 'bg-gray-800 text-blue-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
+                                }`}
+                              >
+                                {num}
+                              </button>
+                              <button
+                                onClick={() => handleCricketPendingHit(num, 2)}
+                                disabled={isClosed || isLocked}
+                                className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
+                                  isClosed || isLocked
+                                    ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+                                    : ckIsPending(num, 2)
+                                    ? 'bg-green-600 text-white border-green-500 scale-105 shadow-lg'
+                                    : 'bg-gray-800 text-green-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
+                                }`}
+                              >
+                                D{num}
+                              </button>
+                              <button
+                                onClick={() => handleCricketPendingHit(num, 3)}
+                                disabled={isClosed || isLocked}
+                                className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
+                                  isClosed || isLocked
+                                    ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+                                    : ckIsPending(num, 3)
+                                    ? 'bg-purple-600 text-white border-purple-500 scale-105 shadow-lg'
+                                    : 'bg-gray-800 text-purple-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
+                                }`}
+                              >
+                                T{num}
+                              </button>
+                            </div>
+                            <div className="flex gap-1.5 w-16 justify-between">
+                              {[0, 1, 2].map(idx => (
+                                <span key={idx} className="text-xs">
+                                  {idx < closedCount ? '🎯' : '🔴'}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          {/* Miss/Submit after highest priority open number */}
+                          {shouldShowMissSubmit && (
+                            <div className="flex items-center gap-3">
+                              <div className="flex gap-3 flex-1">
+                                <button
+                                  onClick={handleCricketPendingMiss}
+                                  disabled={isLocked}
+                                  className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
+                                    isLocked
+                                      ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+                                      : ckIsMissPending
+                                      ? 'bg-red-600 text-white border-red-500 scale-105 shadow-lg'
+                                      : 'bg-gray-800 text-red-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
+                                  }`}
+                                >
+                                  ❌ MISS
+                                </button>
+                                <button
+                                  onClick={handleCricketSubmit}
+                                  disabled={ckPendingSelections.length === 0}
+                                  className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border flex flex-col items-center justify-center ${
+                                    ckPendingSelections.length === 0
+                                      ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed opacity-50'
+                                      : 'bg-green-600 text-white border-2 border-green-400 shadow-lg hover:scale-105'
+                                  }`}
+                                >
+                                  <div>✓ SUBMIT</div>
+                                  <div className={`text-xs font-normal mt-0.5 ${ckPendingSelections.length === 0 ? 'invisible' : ''}`}>
+                                    ({ckPendingSelections.length})
+                                  </div>
+                                </button>
+                              </div>
+                              <div className="w-16"></div>
+                            </div>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Clear/New buttons at bottom */}
+                <div className="grid grid-cols-2 gap-2 mb-6">
+                  <button
+                    onClick={handleCricketClear}
+                    disabled={ckPendingSelections.length === 0}
+                    className={`font-black py-3 px-2 rounded-lg text-xs transition-all transform hover:scale-105 shadow-lg ${
+                      ckPendingSelections.length === 0
+                        ? 'bg-gray-800 text-gray-600 border border-gray-700 cursor-not-allowed opacity-50'
+                        : 'bg-gray-800 text-orange-400 border border-gray-700 hover:bg-gray-700'
+                    }`}
+                  >
+                    ↺ CLEAR
+                  </button>
+                  <button
+                    onClick={handleCricketNewGame}
+                    className="font-black py-3 px-2 rounded-lg text-xs transition-all transform hover:scale-105 shadow-lg bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700"
+                  >
+                    🔄 NEW
+                  </button>
+                </div>
+
+                <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+                  <h3 className="text-lg font-bold mb-3 text-pink-400">📊 STATS</h3>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl font-bold text-yellow-400">{calculateCricketStats(ckCompletedGames).total}</div>
+                      <div className="text-xs text-gray-300 font-medium">GAMES</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold" style={goldGradient}>{calculateCricketStats(ckCompletedGames).avgThrows}</div>
+                      <div className="text-xs text-gray-300 font-medium">AVG CLOSING SPEED</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-green-400">{calculateCricketStats(ckCompletedGames).bestGame || '-'}</div>
+                      <div className="text-xs text-gray-300 font-medium">BEST GAME</div>
+                    </div>
+                  </div>
+                </div>
+
+                {ckCompletedGames.length > 0 && (
+                  <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+                    <h3 className="text-lg font-bold mb-3 text-pink-400">🎯 RECENT GAMES</h3>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {ckCompletedGames.slice(0, 10).map((game, i) => (
+                        <div key={i} className="flex justify-between items-center text-sm bg-gray-800 p-2 rounded">
+                          <span className="text-yellow-400 font-semibold">Game #{ckCompletedGames.length - i}</span>
+                          <span className="text-blue-400 font-semibold">Closing Speed: {game.throws}</span>
+                          <span className="text-gray-400 text-xs">{game.timestamp}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* HISTORY VIEW */}
+            {currentMode === 'history' && (
+              <>
+                <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+                  <h3 className="text-lg font-bold mb-3 text-pink-400">📊 OVERALL STATS</h3>
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div><div className="text-2xl font-bold text-blue-400">{sessions.filter(s => s.mode === 'double-in').length}</div><div className="text-sm text-gray-300 font-medium">DOUBLE-IN</div></div>
+                    <div><div className="text-2xl font-bold text-green-400">{sessions.filter(s => s.mode === 'double-out').length}</div><div className="text-sm text-gray-300 font-medium">DOUBLE-OUT</div></div>
+                    <div><div className="text-2xl font-bold text-purple-400">{sessions.filter(s => s.mode === 'triples').length}</div><div className="text-sm text-gray-300 font-medium">TRIPLES</div></div>
+                    <div><div className="text-2xl font-bold text-pink-400">{sessions.filter(s => s.mode === 'cricket').length}</div><div className="text-sm text-gray-300 font-medium">CRICKET</div></div>
+                  </div>
+                </div>
+
+                {sessions.length > 0 ? (
+                  <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+                    <h3 className="text-lg font-bold mb-3 text-pink-400">📈 SESSION HISTORY</h3>
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {sessions.map((s, idx) => {
+                        const colors = {
+                          'double-in': 'bg-blue-600',
+                          'double-out': 'bg-green-600',
+                          'triples': 'bg-purple-600',
+                          'cricket': 'bg-pink-600'
+                        };
+                        const labels = {
+                          'double-in': 'DOUBLE-IN',
+                          'double-out': 'DOUBLE-OUT',
+                          'triples': 'TRIPLES',
+                          'cricket': 'CRICKET'
+                        };
+                        
+                        const endDateTime = new Date(s.endTime);
+                        const dateStr = endDateTime.toLocaleDateString();
+                        const timeStr = endDateTime.toLocaleTimeString();
+                        
+                        return (
+                          <div key={s.id} className="bg-gray-800 p-3 rounded">
+                            <div className="flex justify-between items-start">
+                              {/* Left side - 3 rows */}
+                              <div className="flex flex-col">
+                                <span className={`${colors[s.mode]} text-white text-xs font-bold px-2 py-1 rounded mb-1 w-fit`}>{labels[s.mode]}</span>
+                                <span className="text-gray-400 text-xs">{dateStr}</span>
+                                <span className="text-gray-400 text-xs">{timeStr}</span>
+                              </div>
+                              {/* Right side - 2 or 3 rows */}
+                              <div className="text-right">
+                                {s.mode === 'cricket' ? (
+                                  <>
+                                    <div className="text-white text-sm font-semibold">Closing Speed: {s.throws} darts</div>
+                                    <div className="text-gray-400 text-xs">{s.missRate || 0}% miss rate</div>
+                                  </>
+                                ) : s.mode === 'triples' ? (
+                                  <>
+                                    <div className="text-white text-sm font-semibold">{s.avgRounds} MPR</div>
+                                    <div className="text-gray-400 text-xs">{s.totalAttempts} attempts</div>
+                                  </>
+                                ) : s.mode === 'double-out' ? (
+                                  <>
+                                    <div className="text-white text-sm font-semibold">{s.successRate}% check-out rate</div>
+                                    <div className="text-gray-400 text-xs">{s.totalAttempts} attempts</div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="text-white text-sm font-semibold">{s.successRate}% double-in rate</div>
+                                    <div className="text-gray-400 text-xs">{s.totalAttempts} attempts</div>
+                                    <div className="text-gray-400 text-xs">avg score: {s.expectedValue}</div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-3">Your last 100 sessions are saved. Use the same device to practice.</p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-900 rounded-lg p-8 text-center mb-8 border border-gray-800">
+                    <p className="text-gray-400 text-sm">No sessions yet. Complete a training session to see it here!</p>
+                  </div>
+                )}
+
+                <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+                  <div className="flex items-start mb-3">
+                    <input type="checkbox" id="confirmClear" checked={confirmClear} onChange={(e) => setConfirmClear(e.target.checked)} className="mt-1 mr-3 w-5 h-5 cursor-pointer" />
+                    <label htmlFor="confirmClear" className="text-sm text-gray-300 cursor-pointer">Delete all session history and start again.</label>
+                  </div>
+                  <button onClick={clearAllData} disabled={!confirmClear} className={`w-full font-black py-3 px-6 rounded-lg transition-all border-2 shadow-lg ${confirmClear ? 'bg-pink-600 hover:bg-pink-700 text-white border-pink-500 transform hover:scale-105 cursor-pointer' : 'bg-gray-700 text-gray-500 border-gray-600 cursor-not-allowed opacity-50'}`} style={confirmClear ? {textShadow: '2px 2px 4px rgba(0,0,0,0.8)'} : {}}>
+                    🧹 CLEAR ALL PRACTICE DATA
+                  </button>
+                </div>
+
+                {/* Back button */}
+                <button
+                  onClick={() => {
+                    handleModeChange('double-in');
+                    setTimeout(() => {
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }, 50);
+                  }}
+                  className="w-full py-4 px-6 rounded-lg font-bold text-base transition-all transform hover:scale-105 shadow-lg bg-purple-600 text-gray-300 border-2 border-gray-300 hover:bg-purple-700 mb-8"
+                >
+                  ← BACK TO TRAINING
+                </button>
+              </>
+            )}
+
+            {/* STATS SECTION - More breathing room */}
+            {currentMode !== 'history' && currentMode !== 'cricket' && (
+              <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+                <h3 className="text-lg font-bold mb-3 text-pink-400">📊 STATS</h3>
+                {currentMode === 'triples' ? (
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div><div className="text-2xl font-bold text-yellow-400">{getCurrentStats().total}</div><div className="text-sm text-gray-300 font-medium">TOTAL ATTEMPTS</div></div>
+                    <div><div className="text-2xl font-bold" style={goldGradient}>{getCurrentStats().avgRounds}</div><div className="text-sm text-gray-300 font-medium">AVG ROUNDS</div></div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div><div className="text-2xl font-bold text-yellow-400">{getCurrentStats().total}</div><div className="text-sm text-gray-300 font-medium">TOTAL ATTEMPTS</div></div>
+                    <div><div className="text-2xl font-bold" style={goldGradient}>{getCurrentStats().successRate}%</div><div className="text-sm text-gray-300 font-medium">SUCCESS RATE</div></div>
+                    <div><div className="text-2xl font-bold text-green-400">{getCurrentStats().successes}</div><div className="text-sm text-gray-300 font-medium">{currentMode === 'double-out' ? 'GOT OUT' : 'GOT IN'}</div></div>
+                    <div><div className="text-2xl font-bold text-red-400">{getCurrentStats().failures}</div><div className="text-sm text-gray-300 font-medium">MISS</div></div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* RECENT ATTEMPTS - More breathing room */}
+            {currentMode !== 'history' && currentMode !== 'cricket' && getCurrentAttempts().length > 0 && (
+              <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+                <h3 className="text-lg font-bold mb-3 text-pink-400">📝 RECENT {currentMode === 'triples' ? 'THROWS' : currentMode === 'double-out' ? 'ATTEMPTS' : 'INS'}</h3>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {getCurrentAttempts().slice(0, 10).map((a, i) => (
+                    <div key={i} className="flex justify-between items-center text-sm bg-gray-800 p-2 rounded">
+                      <span className="text-yellow-400 font-semibold">
+                        {currentMode === 'triples' ? a.number : currentMode === 'double-out' ? `D${a.number}` : (a.outcome === 'success' && a.score ? `Score: ${a.score}` : 'DOUBLE IN')}
+                      </span>
+                      <span className={`font-semibold ${currentMode === 'triples' ? 'text-blue-400' : a.outcome === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+                        {currentMode === 'triples' ? (a.rounds === 0 ? '❌ MISS' : `✅ ${a.number === 'Bull' ? 'C' : 'R'}${a.rounds}`) : (a.outcome === 'success' ? (currentMode === 'double-out' ? '✅' : '✅ GOT IN') : (currentMode === 'double-out' ? '❌' : '❌ MISSED'))}
+                      </span>
+                      <span className="text-gray-400 text-xs">{a.timestamp}</span>
+                    </div>
                   ))}
                 </div>
               </div>
-              
-              {/* Render Current Mode */}
-              {CurrentModeComponent && (
-                <CurrentModeComponent
-                  key={refreshKey}
-                  sessions={sessions}
-                />
-              )}
-              
-              {/* Status Messages */}
-              {saveStatus && (
-                <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-                  <div className="text-xs text-center text-yellow-300 font-semibold">{saveStatus}</div>
-                </div>
-              )}
-              
-              {/* Footer */}
-              <div className="text-center mt-12 mb-12">
-                <div className="text-4xl" style={{letterSpacing: '0.5em'}}>🤜👈</div>
+            )}
+
+            {/* SAVE STATUS */}
+            {saveStatus && (
+              <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+                <div className="text-xs text-center text-yellow-300 font-semibold">{saveStatus}</div>
               </div>
-              <div className="text-center text-yellow-400 text-xs font-semibold leading-tight">
-                <p>All rights reserved</p>
-                <p>Flatbush vs. Everybody</p>
+            )}
+
+            {/* HISTORY BUTTON - Now at bottom, more prominent */}
+            {currentMode !== 'history' && (
+              <div className="mb-8">
+                <button
+                  onClick={() => handleModeChange('history')}
+                  className="w-full py-4 px-6 rounded-lg font-bold text-base transition-all transform hover:scale-105 shadow-lg bg-purple-600 text-gray-300 border-2 border-gray-300 hover:bg-purple-700"
+                >
+                  📊 VIEW TRAINING HISTORY
+                </button>
               </div>
+            )}
+
+            {/* FOOTER */}
+            <div className="text-center mt-12 mb-12">
+              <div className="text-4xl" style={{letterSpacing: '0.5em'}}>🤜👈</div>
+            </div>
+            <div className="text-center text-yellow-400 text-xs font-semibold leading-tight">
+              <p>All rights reserved</p>
+              <p>Flatbush vs. Everybody</p>
             </div>
           </div>
-        </SessionContext.Provider>
+        </div>
       );
     };
-    
-    // ============================================================================
-    // SECTION 9: APP INITIALIZATION
-    // ============================================================================
-    
+
     ReactDOM.render(<WB4DartTrainer />, document.getElementById('root'));
   </script>
 </body>
