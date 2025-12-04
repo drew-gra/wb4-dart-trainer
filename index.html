@@ -119,6 +119,16 @@
       const handleModeChange = (mode) => {
         setCurrentMode(mode);
         trackEvent('Mode Changed', { mode });
+        
+        // Track Insights views with data sufficiency context
+        if (mode === 'insights') {
+          const dataSufficiency = calculateDataSufficiency();
+          trackEvent('Insights Viewed', { 
+            hasRecommendation: dataSufficiency.hasMinimum,
+            totalDarts: dataSufficiency.totalAttempts,
+            confidence: dataSufficiency.confidence
+          });
+        }
       };
 
       // Scroll to content when mode changes (but not on initial load or when going to History/Insights)
@@ -654,6 +664,13 @@
               newTargetData[num].triples++;
             }
           }
+        });
+        
+        // Track Cricket engagement
+        trackEvent('Attempt Recorded', { 
+          mode: 'cricket', 
+          darts: ckPendingSelections.length,
+          missCount: missCount
         });
         
         setCkHits(newHits);
