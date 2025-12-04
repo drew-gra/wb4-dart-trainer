@@ -671,49 +671,16 @@
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 mb-6">
-                  <button
-                    onClick={handleCricketSubmit}
-                    disabled={ckPendingSelections.length === 0}
-                    className={`font-black py-3 px-2 rounded-lg text-xs transition-all transform hover:scale-105 shadow-lg flex flex-col items-center justify-center ${
-                      ckPendingSelections.length === 0
-                        ? 'bg-gray-800 text-gray-600 border border-gray-700 cursor-not-allowed opacity-50'
-                        : 'bg-green-600 text-white border-2 border-green-400 shadow-lg'
-                    }`}
-                  >
-                    <div>✓ SUBMIT</div>
-                    <div className={`text-xs font-normal mt-0.5 ${ckPendingSelections.length === 0 ? 'invisible' : ''}`}>
-                      ({ckPendingSelections.length})
-                    </div>
-                  </button>
-                  <button
-                    onClick={handleCricketClear}
-                    disabled={ckPendingSelections.length === 0}
-                    className={`font-black py-3 px-2 rounded-lg text-xs transition-all transform hover:scale-105 shadow-lg flex flex-col items-center justify-center ${
-                      ckPendingSelections.length === 0
-                        ? 'bg-gray-800 text-gray-600 border border-gray-700 cursor-not-allowed opacity-50'
-                        : 'bg-gray-800 text-orange-400 border border-gray-700 hover:bg-gray-700'
-                    }`}
-                  >
-                    <div>↺ CLEAR</div>
-                    <div className="text-xs font-normal mt-0.5 invisible">&nbsp;</div>
-                  </button>
-                  <button
-                    onClick={handleCricketNewGame}
-                    className="font-black py-3 px-2 rounded-lg text-xs transition-all transform hover:scale-105 shadow-lg bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700 flex flex-col items-center justify-center"
-                  >
-                    <div>🔄 NEW</div>
-                    <div className="text-xs font-normal mt-0.5 invisible">&nbsp;</div>
-                  </button>
-                </div>
-
                 <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
                   <div className="space-y-3">
-                    {ckNumbers.map(num => {
+                    {ckNumbers.map((num, index) => {
                       const remaining = ckGetRemainingHits(num);
                       const isClosed = remaining === 0;
                       const isLocked = ckPendingSelections.length >= 3;
                       const closedCount = ckHits[num];
+                      
+                      // Check if this is the last open number
+                      const isLastOpen = !isClosed && (index === ckNumbers.length - 1 || ckHits[ckNumbers[index + 1]] >= 3);
                       
                       if (num === 'Bull') {
                         return (
@@ -756,80 +723,158 @@
                               </div>
                             </div>
                             
-                            <div className="flex items-center gap-3">
-                              <button
-                                onClick={handleCricketPendingMiss}
-                                disabled={isLocked}
-                                className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
-                                  isLocked
-                                    ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
-                                    : ckIsMissPending
-                                    ? 'bg-red-600 text-white border-red-500 scale-105 shadow-lg'
-                                    : 'bg-gray-800 text-red-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
-                                }`}
-                              >
-                                ❌ MISS
-                              </button>
-                              <div className="w-16"></div>
-                            </div>
+                            {/* Miss/Submit after last open number */}
+                            {isLastOpen && (
+                              <div className="flex items-center gap-3">
+                                <div className="flex gap-3 flex-1">
+                                  <button
+                                    onClick={handleCricketPendingMiss}
+                                    disabled={isLocked}
+                                    className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
+                                      isLocked
+                                        ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+                                        : ckIsMissPending
+                                        ? 'bg-red-600 text-white border-red-500 scale-105 shadow-lg'
+                                        : 'bg-gray-800 text-red-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
+                                    }`}
+                                  >
+                                    ❌ MISS
+                                  </button>
+                                  <button
+                                    onClick={handleCricketSubmit}
+                                    disabled={ckPendingSelections.length === 0}
+                                    className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border flex flex-col items-center justify-center ${
+                                      ckPendingSelections.length === 0
+                                        ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed opacity-50'
+                                        : 'bg-green-600 text-white border-2 border-green-400 shadow-lg hover:scale-105'
+                                    }`}
+                                  >
+                                    <div>✓ SUBMIT</div>
+                                    <div className={`text-xs font-normal mt-0.5 ${ckPendingSelections.length === 0 ? 'invisible' : ''}`}>
+                                      ({ckPendingSelections.length})
+                                    </div>
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </Fragment>
                         );
                       }
                       
                       return (
-                        <div key={num} className="flex items-center gap-3">
-                          <div className="flex gap-3 flex-1">
-                            <button
-                              onClick={() => handleCricketPendingHit(num, 3)}
-                              disabled={isClosed || isLocked}
-                              className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
-                                isClosed || isLocked
-                                  ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
-                                  : ckIsPending(num, 3)
-                                  ? 'bg-purple-600 text-white border-purple-500 scale-105 shadow-lg'
-                                  : 'bg-gray-800 text-purple-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
-                              }`}
-                            >
-                              T{num}
-                            </button>
-                            <button
-                              onClick={() => handleCricketPendingHit(num, 1)}
-                              disabled={isClosed || isLocked}
-                              className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
-                                isClosed || isLocked
-                                  ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
-                                  : ckIsPending(num, 1)
-                                  ? 'bg-blue-600 text-white border-blue-500 scale-105 shadow-lg'
-                                  : 'bg-gray-800 text-blue-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
-                              }`}
-                            >
-                              {num}
-                            </button>
-                            <button
-                              onClick={() => handleCricketPendingHit(num, 2)}
-                              disabled={isClosed || isLocked}
-                              className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
-                                isClosed || isLocked
-                                  ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
-                                  : ckIsPending(num, 2)
-                                  ? 'bg-green-600 text-white border-green-500 scale-105 shadow-lg'
-                                  : 'bg-gray-800 text-green-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
-                              }`}
-                            >
-                              D{num}
-                            </button>
+                        <Fragment key={num}>
+                          <div className="flex items-center gap-3">
+                            <div className="flex gap-3 flex-1">
+                              <button
+                                onClick={() => handleCricketPendingHit(num, 1)}
+                                disabled={isClosed || isLocked}
+                                className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
+                                  isClosed || isLocked
+                                    ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+                                    : ckIsPending(num, 1)
+                                    ? 'bg-blue-600 text-white border-blue-500 scale-105 shadow-lg'
+                                    : 'bg-gray-800 text-blue-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
+                                }`}
+                              >
+                                {num}
+                              </button>
+                              <button
+                                onClick={() => handleCricketPendingHit(num, 2)}
+                                disabled={isClosed || isLocked}
+                                className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
+                                  isClosed || isLocked
+                                    ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+                                    : ckIsPending(num, 2)
+                                    ? 'bg-green-600 text-white border-green-500 scale-105 shadow-lg'
+                                    : 'bg-gray-800 text-green-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
+                                }`}
+                              >
+                                D{num}
+                              </button>
+                              <button
+                                onClick={() => handleCricketPendingHit(num, 3)}
+                                disabled={isClosed || isLocked}
+                                className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
+                                  isClosed || isLocked
+                                    ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+                                    : ckIsPending(num, 3)
+                                    ? 'bg-purple-600 text-white border-purple-500 scale-105 shadow-lg'
+                                    : 'bg-gray-800 text-purple-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
+                                }`}
+                              >
+                                T{num}
+                              </button>
+                            </div>
+                            <div className="flex gap-1.5 w-16 justify-between">
+                              {[0, 1, 2].map(idx => (
+                                <span key={idx} className="text-xs">
+                                  {idx < closedCount ? '🎯' : '🔴'}
+                                </span>
+                              ))}
+                            </div>
                           </div>
-                          <div className="flex gap-1.5 w-16 justify-between">
-                            {[0, 1, 2].map(idx => (
-                              <span key={idx} className="text-xs">
-                                {idx < closedCount ? '🎯' : '🔴'}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
+                          
+                          {/* Miss/Submit after last open number */}
+                          {isLastOpen && (
+                            <div className="flex items-center gap-3">
+                              <div className="flex gap-3 flex-1">
+                                <button
+                                  onClick={handleCricketPendingMiss}
+                                  disabled={isLocked}
+                                  className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
+                                    isLocked
+                                      ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+                                      : ckIsMissPending
+                                      ? 'bg-red-600 text-white border-red-500 scale-105 shadow-lg'
+                                      : 'bg-gray-800 text-red-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
+                                  }`}
+                                >
+                                  ❌ MISS
+                                </button>
+                                <button
+                                  onClick={handleCricketSubmit}
+                                  disabled={ckPendingSelections.length === 0}
+                                  className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border flex flex-col items-center justify-center ${
+                                    ckPendingSelections.length === 0
+                                      ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed opacity-50'
+                                      : 'bg-green-600 text-white border-2 border-green-400 shadow-lg hover:scale-105'
+                                  }`}
+                                >
+                                  <div>✓ SUBMIT</div>
+                                  <div className={`text-xs font-normal mt-0.5 ${ckPendingSelections.length === 0 ? 'invisible' : ''}`}>
+                                    ({ckPendingSelections.length})
+                                  </div>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </Fragment>
                       );
                     })}
                   </div>
+                </div>
+
+                {/* Clear/New buttons at bottom */}
+                <div className="grid grid-cols-2 gap-2 mb-6">
+                  <button
+                    onClick={handleCricketClear}
+                    disabled={ckPendingSelections.length === 0}
+                    className={`font-black py-3 px-2 rounded-lg text-xs transition-all transform hover:scale-105 shadow-lg flex flex-col items-center justify-center ${
+                      ckPendingSelections.length === 0
+                        ? 'bg-gray-800 text-gray-600 border border-gray-700 cursor-not-allowed opacity-50'
+                        : 'bg-gray-800 text-orange-400 border border-gray-700 hover:bg-gray-700'
+                    }`}
+                  >
+                    <div>↺ CLEAR</div>
+                    <div className="text-xs font-normal mt-0.5 invisible">&nbsp;</div>
+                  </button>
+                  <button
+                    onClick={handleCricketNewGame}
+                    className="font-black py-3 px-2 rounded-lg text-xs transition-all transform hover:scale-105 shadow-lg bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700 flex flex-col items-center justify-center"
+                  >
+                    <div>🔄 NEW</div>
+                    <div className="text-xs font-normal mt-0.5 invisible">&nbsp;</div>
+                  </button>
                 </div>
 
                 <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
