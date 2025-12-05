@@ -3,20 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WB4 Dart Trainer</title>
-  <!-- Privacy-friendly analytics by Plausible -->
-  <script async src="https://plausible.io/js/pa-U8-aUnnw8KUKYtDzdjfeJ.js"></script>
-  <script>
-    window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
-    plausible.init()
-  </script>
+  <title>501 Multiplayer Demo - WB4 Darts</title>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  
   <style>
-    input[type="number"]::-webkit-outer-spin-button,
-    input[type="number"]::-webkit-inner-spin-button {
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    
+    /* Hide number input spinners */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
       -webkit-appearance: none;
       margin: 0;
     }
@@ -29,1433 +37,690 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useContext, useCallback, useMemo, createContext, Fragment, useRef } = React;
+    const { useState, useEffect, useRef } = React;
 
     // ============================================================================
-    // WB4 DART TRAINER - WITH CRICKET MODE
+    // FIREBASE CONFIG - Keep this for both demo and production
     // ============================================================================
-
-    // CUSTOM HOOK: Session Manager
-    const useSessionManager = () => {
-      const [sessions, setSessions] = useState([]);
-
-      useEffect(() => {
-        const saved = localStorage.getItem('wb4UnifiedSessionHistory');
-        if (saved) {
-          try {
-            setSessions(JSON.parse(saved));
-          } catch (e) {
-            console.error('Error loading sessions:', e);
-          }
-        }
-      }, []);
-
-      const addSession = (sessionData) => {
-        setSessions(prev => {
-          const updated = [sessionData, ...prev].slice(0, 100);
-          localStorage.setItem('wb4UnifiedSessionHistory', JSON.stringify(updated));
-          return updated;
-        });
-      };
-
-      const clearSessions = () => {
-        setSessions([]);
-        localStorage.removeItem('wb4UnifiedSessionHistory');
-      };
-
-      return { sessions, addSession, clearSessions };
+    const firebaseConfig = {
+      apiKey: "AIzaSyC-2P0ZK-q-hY4MhF_8v1yJV_AxgU8y5F4",
+      authDomain: "wb4-darts.firebaseapp.com",
+      databaseURL: "https://wb4-darts-default-rtdb.firebaseio.com",
+      projectId: "wb4-darts",
+      storageBucket: "wb4-darts.firebasestorage.app",
+      messagingSenderId: "179763980072",
+      appId: "1:179763980072:web:4f9a40b0a0e9163c4c121d"
     };
 
-    // MAIN COMPONENT
-    const WB4DartTrainer = () => {
-      const [currentMode, setCurrentMode] = useState(null);
-      const [saveStatus, setSaveStatus] = useState('');
-      const [confirmClear, setConfirmClear] = useState(false);
-      const { sessions, addSession, clearSessions } = useSessionManager();
-      const contentRef = useRef(null);
-      const isInitialMount = useRef(true);
+    // Initialize Firebase
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const database = firebase.database();
 
-      const [diAttempts, setDiAttempts] = useState([]);
-      const [diSessionStart, setDiSessionStart] = useState(null);
-      const [diScoreInput, setDiScoreInput] = useState('');
-
-      const [doAttempts, setDoAttempts] = useState([]);
-      const [doSessionStart, setDoSessionStart] = useState(null);
-      const [doCurrentTarget, setDoCurrentTarget] = useState(null);
-      const [doConsecutiveFails, setDoConsecutiveFails] = useState(0);
-
-      const [tpAttempts, setTpAttempts] = useState([]);
-      const [tpSessionStart, setTpSessionStart] = useState(null);
-      const [tpCurrentTarget, setTpCurrentTarget] = useState(null);
-
-      // Cricket mode state
-      const [ckHits, setCkHits] = useState({ 20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, Bull: 0 });
-      const [ckTotalThrows, setCkTotalThrows] = useState(0);
-      const [ckMissCount, setCkMissCount] = useState(0);
-      const [ckGameStart, setCkGameStart] = useState(null);
-      const [ckCompletedGames, setCkCompletedGames] = useState([]);
-      const [ckPendingSelections, setCkPendingSelections] = useState([]);
-      const [ckTargetData, setCkTargetData] = useState({}); // Track singles/doubles/triples per number
-
-      const PRIORITY_DOUBLES = [16, 20, 8, 12];
-      const TRIPLES_NUMBERS = [15, 16, 17, 18, 19, 20, 'Bull'];
-      const CRICKET_WEIGHTS = { 15: 1, 16: 1, 17: 1, 18: 1, 19: 1, 20: 1, 'Bull': 0.2 };
-
-      // MODES CONFIGURATION - Only training modes, History moved to bottom
-      const TRAINING_MODES = [
-        { id: 'double-in', label: 'DOUBLE-IN', description: 'Practice getting into the game with any double' },
-        { id: 'double-out', label: 'DOUBLE-OUT', description: 'Master your checkout doubles with targeted practice' },
-        { id: 'triples', label: 'TRIPLES', description: 'Hit triples consistently to dominate Cricket' },
-        { id: 'cricket', label: 'CRICKET', description: 'Close everything - full Cricket game simulation' }
-      ];
-
-      // TRACKING HELPER
-      const trackEvent = (eventName, props = {}) => {
-        if (window.plausible) {
-          window.plausible(eventName, { props });
-        }
-      };
-
-      const handleModeChange = (mode) => {
-        setCurrentMode(mode);
-        trackEvent('Mode Changed', { mode });
-      };
-
-      // Scroll to content when mode changes (but not on initial load or when going to History/Insights)
-      useEffect(() => {
-        if (isInitialMount.current) {
-          isInitialMount.current = false;
-          return;
-        }
-        
-        // Scroll to top for History, Insights, and landing page (null)
-        if (currentMode === 'history' || currentMode === 'insights' || currentMode === null) {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-          return;
-        }
-        
-        if (contentRef.current) {
-          contentRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, [currentMode]);
-
-      const showStatus = (msg, timeout = 2000) => {
-        setSaveStatus(msg);
-        setTimeout(() => setSaveStatus(''), timeout);
-      };
-
-      const calculateStats = (attempts) => {
-        const total = attempts.length;
-        const successes = attempts.filter(a => a.outcome === 'success').length;
-        const rate = total > 0 ? Math.round((successes / total) * 100) : 0;
-        return { total, successes, failures: total - successes, successRate: rate };
-      };
-
-      const calculateTriplesStats = (attempts) => {
-        const total = attempts.length;
-        const totalRounds = attempts.reduce((sum, a) => sum + (a.rounds || 0), 0);
-        const avg = total > 0 ? (totalRounds / total).toFixed(2) : 0;
-        return { total, totalRounds, avgRounds: avg };
-      };
-
-      const calculateCricketStats = (attempts) => {
-        const total = attempts.length;
-        const totalThrows = attempts.reduce((sum, a) => sum + (a.throws || 0), 0);
-        const avgThrows = total > 0 ? (totalThrows / total).toFixed(1) : 0;
-        const bestGame = total > 0 ? Math.min(...attempts.map(a => a.throws)) : 0;
-        return { total, totalThrows, avgThrows, bestGame };
-      };
-
-      /*
-       * ═══════════════════════════════════════════════════════════════
-       * HEAT MAP DATA ARCHITECTURE (Option B - Aggregated per session)
-       * ═══════════════════════════════════════════════════════════════
-       * 
-       * Current: We store aggregated targetData per session for efficiency.
-       * Each session includes: { targetData: { 16: {attempts: 5, hits: 3}, ... } }
-       * 
-       * Valid data sources:
-       * - Double-Out: App assigns target → knows attempts + outcomes
-       * - Triples: App assigns target → knows rounds thrown at each target
-       * - Cricket: User clicks specific buttons (T20, 20, D20) → knows exact hits
-       * 
-       * Invalid data sources (not included):
-       * - Double-In: User chooses target → app cannot verify intent
-       * 
-       * FUTURE CONSIDERATION (Option A - Granular):
-       * If we need individual attempt timestamps, streak analysis, or time-series
-       * data in the future, consider migrating to:
-       * { attempts: [{ target: 16, type: 'double', success: true, timestamp: ... }] }
-       * 
-       * Migration path: Keep Option B structure, add optional attempts[] array.
-       * This allows backward compatibility while supporting granular tracking.
-       * 
-       * Estimated storage impact: ~150KB vs current ~20KB for 100 sessions
-       * ═══════════════════════════════════════════════════════════════
-       */
-
-      // Aggregate attempts into targetData for heat map
-      const buildDoubleOutTargetData = (attempts) => {
-        const targetData = {};
-        attempts.forEach(attempt => {
-          const num = attempt.number;
-          if (!targetData[num]) {
-            targetData[num] = { attempts: 0, hits: 0 };
-          }
-          targetData[num].attempts++;
-          if (attempt.outcome === 'success') {
-            targetData[num].hits++;
-          }
-        });
-        return targetData;
-      };
-
-      const buildTriplesTargetData = (attempts) => {
-        const targetData = {};
-        attempts.forEach(attempt => {
-          const num = attempt.number;
-          if (!targetData[num]) {
-            targetData[num] = { attempts: 0, totalMarks: 0 };
-          }
-          targetData[num].attempts++;  // Count each 3-dart attempt
-          targetData[num].totalMarks += attempt.rounds || 0;  // Sum the marks (confusingly called "rounds")
-        });
-        return targetData;
-      };
-
-      // Aggregate heat map data across all sessions
-      const aggregateHeatMapData = () => {
-        const aggregated = {};
-        
-        sessions.forEach(session => {
-          // Only include sessions with location data (double-out, triples, and cricket)
-          if (session.mode !== 'double-out' && session.mode !== 'triples' && session.mode !== 'cricket') return;
-          if (!session.targetData) return;
-          
-          Object.entries(session.targetData).forEach(([num, data]) => {
-            if (!aggregated[num]) {
-              aggregated[num] = { attempts: 0, hits: 0, triplesAttempts: 0, totalMarks: 0 };
-            }
-            
-            if (session.mode === 'double-out') {
-              aggregated[num].attempts += data.attempts || 0;
-              aggregated[num].hits += data.hits || 0;
-            } else if (session.mode === 'triples') {
-              aggregated[num].triplesAttempts += data.attempts || 0;  // Number of 3-dart attempts
-              aggregated[num].totalMarks += data.totalMarks || 0;     // Sum of marks
-            } else if (session.mode === 'cricket') {
-              // Cricket provides direct counts of singles/doubles/triples hit
-              // For doubles analysis: add to attempts and hits
-              if (data.doubles > 0) {
-                aggregated[num].attempts += data.doubles;
-                aggregated[num].hits += data.doubles; // They hit what they aimed at
-              }
-              
-              // For triples analysis: convert to marks and attempts
-              // Each triple button press = 1 attempt at triple, worth 3 marks if hit
-              if (data.triples > 0) {
-                aggregated[num].triplesAttempts += data.triples;
-                aggregated[num].totalMarks += data.triples * 3; // Each triple = 3 marks
-              }
-            }
-          });
-        });
-        
-        return aggregated;
-      };
-
-      // Regional analysis for insights
-      const regions = {
-        top: { name: 'Top', numbers: [5, 20, 1, 18, 4, 13] },
-        right: { name: 'Right', numbers: [13, 6, 10, 15, 2, 17] },
-        bottom: { name: 'Bottom', numbers: [17, 3, 19, 7, 16, 8] },
-        left: { name: 'Left', numbers: [8, 11, 14, 9, 12, 5] }
-      };
-
-      const calculateRegionalAnalysis = () => {
-        const heatData = aggregateHeatMapData();
-        
-        // Calculate effectiveness for a single number
-        const getNumberEffectiveness = (num) => {
-          const d = heatData[num];
-          if (!d) return { doubleRate: 0, tripleRate: 0, totalWeight: 0 };
-          
-          const doubleRate = d.attempts > 0 ? (d.hits / d.attempts) * 100 : 0;
-          const tripleMPR = d.triplesAttempts > 0 ? d.totalMarks / d.triplesAttempts : 0;
-          const tripleRate = (tripleMPR / 9) * 100; // Normalize to percentage
-          
-          const totalWeight = d.attempts + d.triplesAttempts;
-          
-          return { doubleRate, tripleRate, totalWeight };
-        };
-
-        // Calculate regional score
-        const getRegionalScore = (numbers) => {
-          let totalWeightedScore = 0;
-          let totalWeight = 0;
-
-          numbers.forEach(num => {
-            const { doubleRate, tripleRate, totalWeight: weight } = getNumberEffectiveness(num);
-            const d = heatData[num];
-            
-            const doubleWeight = d?.attempts || 0;
-            const tripleWeight = d?.triplesAttempts || 0;
-            
-            const numberScore = doubleWeight + tripleWeight > 0
-              ? (doubleRate * doubleWeight + tripleRate * tripleWeight) / (doubleWeight + tripleWeight)
-              : 0;
-            
-            totalWeightedScore += numberScore * weight;
-            totalWeight += weight;
-          });
-
-          const regionalScore = totalWeight > 0 ? totalWeightedScore / totalWeight : 0;
-          return { score: regionalScore, weight: totalWeight };
-        };
-
-        // Analyze all regions
-        const analysis = {};
-        Object.entries(regions).forEach(([key, region]) => {
-          analysis[key] = {
-            ...region,
-            ...getRegionalScore(region.numbers)
-          };
-        });
-
-        return analysis;
-      };
-
-      const calculateDataSufficiency = () => {
-        const heatData = aggregateHeatMapData();
-        const allNumbers = Object.keys(heatData);
-        
-        // Calculate total DARTS thrown (not attempts/turns)
-        // Double-Out and Triples: each attempt = 1 turn = 3 darts
-        // Cricket: each button press = 1 dart
-        const totalDarts = allNumbers.reduce((sum, num) => {
-          const d = heatData[num];
-          const doubleOutDarts = (d?.attempts || 0) * 3;  // Each attempt = 3 darts
-          const triplesDarts = (d?.triplesAttempts || 0) * 3;  // Each attempt = 3 darts
-          // Cricket singles/doubles/triples are already individual darts
-          return sum + doubleOutDarts + triplesDarts;
-        }, 0);
-
-        // Check per-region minimums (in darts)
-        const regionData = {};
-        Object.entries(regions).forEach(([key, region]) => {
-          const darts = region.numbers.reduce((sum, num) => {
-            const d = heatData[num];
-            const doubleOutDarts = (d?.attempts || 0) * 3;
-            const triplesDarts = (d?.triplesAttempts || 0) * 3;
-            return sum + doubleOutDarts + triplesDarts;
-          }, 0);
-          regionData[key] = darts;
-        });
-
-        const minRegion = Math.min(...Object.values(regionData));
-        const regionsWithData = Object.values(regionData).filter(a => a > 0).length;
-
-        return {
-          totalAttempts: totalDarts,  // Now in darts, not turns
-          regionData,
-          minRegion,
-          regionsWithData,
-          hasMinimum: totalDarts >= 360 && regionsWithData === 4 && minRegion >= 90,
-          confidence: totalDarts < 360 ? 'insufficient' : 
-                      totalDarts < 720 ? 'initial' : 
-                      totalDarts < 1440 ? 'solid' : 'high'
-        };
-      };
-
-      const generateDoubleOutTarget = () => {
-        const weights = {};
-        for (let i = 1; i <= 20; i++) {
-          weights[i] = PRIORITY_DOUBLES.includes(i) ? 1.75 : 1;
-        }
-        if (doConsecutiveFails >= 4) {
-          const bonus = Math.floor((doConsecutiveFails - 3) * 2);
-          PRIORITY_DOUBLES.forEach(n => weights[n] += bonus);
-        }
-        const total = Object.values(weights).reduce((sum, w) => sum + w, 0);
-        let rand = Math.random() * total;
-        for (const [num, weight] of Object.entries(weights)) {
-          rand -= weight;
-          if (rand <= 0) return parseInt(num);
-        }
-        return 20;
-      };
-
-      const recordDoubleOut = (outcome) => {
-        const now = new Date();
-        if (doAttempts.length === 0) setDoSessionStart(now);
-
-        const attempt = {
-          number: doCurrentTarget,
-          outcome,
-          timestamp: now.toLocaleTimeString()
-        };
-
-        setDoAttempts(prev => [attempt, ...prev]);
-        trackEvent('Attempt Recorded', { mode: 'double-out', outcome, target: doCurrentTarget });
-        setDoConsecutiveFails(outcome === 'success' ? 0 : doConsecutiveFails + 1);
-        setDoCurrentTarget(generateDoubleOutTarget());
-        showStatus('💾 Saved', 1000);
-      };
-
-      const saveDoubleOutSession = () => {
-        if (doAttempts.length === 0) return;
-        
-        const stats = calculateStats(doAttempts);
-        const targetData = buildDoubleOutTargetData(doAttempts);
-        const duration = Math.round((new Date() - doSessionStart) / 60000);
-        
-        addSession({
-          id: Date.now(),
-          mode: 'double-out',
-          startTime: doSessionStart.toISOString(),
-          endTime: new Date().toISOString(),
-          duration,
-          totalAttempts: stats.total,
-          successRate: stats.successRate,
-          successes: stats.successes,
-          failures: stats.failures,
-          targetData  // Heat map data
-        });
-
-        trackEvent('Training Session Completed', {
-          mode: 'double-out',
-          attempts: stats.total,
-          successRate: stats.successRate,
-          duration: duration
-        });
-
-        setDoAttempts([]);
-        setDoSessionStart(null);
-        setDoConsecutiveFails(0);
-        setDoCurrentTarget(generateDoubleOutTarget());
-        showStatus('📊 Session saved', 1500);
-      };
-
-      const recordDoubleIn = (outcome) => {
-        const now = new Date();
-        if (diAttempts.length === 0) setDiSessionStart(now);
-
-        let score = null;
-        if (outcome === 'success' && diScoreInput) {
-          const val = parseInt(diScoreInput);
-          if (val >= 2 && val <= 170) {
-            score = val;
-            setDiScoreInput('');
-            trackEvent('Score Entered', { score: val, mode: 'double-in' });
-          } else {
-            showStatus('⚠️ Score must be 2-170', 2000);
-            return;
-          }
-        }
-
-        const attempt = { outcome, score, timestamp: now.toLocaleTimeString() };
-        setDiAttempts(prev => [attempt, ...prev]);
-        trackEvent('Attempt Recorded', { mode: 'double-in', outcome });
-        showStatus('💾 Saved', 1000);
-      };
-
-      const saveDoubleInSession = () => {
-        if (diAttempts.length === 0) return;
-
-        const stats = calculateStats(diAttempts);
-        const duration = Math.round((new Date() - diSessionStart) / 60000);
-        const scores = diAttempts.filter(a => a.outcome === 'success' && a.score).map(a => a.score);
-        const totalScore = scores.reduce((sum, s) => sum + s, 0);
-        const expectedValue = diAttempts.length > 0 ? (totalScore / diAttempts.length).toFixed(1) : 0;
-
-        addSession({
-          id: Date.now(),
-          mode: 'double-in',
-          startTime: diSessionStart.toISOString(),
-          endTime: new Date().toISOString(),
-          duration,
-          totalAttempts: stats.total,
-          successRate: stats.successRate,
-          successes: stats.successes,
-          failures: stats.failures,
-          expectedValue: parseFloat(expectedValue)
-        });
-
-        trackEvent('Training Session Completed', {
-          mode: 'double-in',
-          attempts: stats.total,
-          successRate: stats.successRate,
-          duration: duration
-        });
-
-        setDiAttempts([]);
-        setDiSessionStart(null);
-        showStatus('📊 Session saved', 1500);
-      };
-
-      const generateTriplesTarget = () => {
-        const total = Object.values(CRICKET_WEIGHTS).reduce((sum, w) => sum + w, 0);
-        let rand = Math.random() * total;
-        for (const [num, weight] of Object.entries(CRICKET_WEIGHTS)) {
-          rand -= weight;
-          if (rand <= 0) return num === 'Bull' ? 'Bull' : parseInt(num);
-        }
-        return 20;
-      };
-
-      const recordTriples = (rounds) => {
-        const now = new Date();
-        if (tpAttempts.length === 0) setTpSessionStart(now);
-
-        const attempt = {
-          number: tpCurrentTarget,
-          rounds,
-          timestamp: now.toLocaleTimeString()
-        };
-
-        setTpAttempts(prev => [attempt, ...prev]);
-        trackEvent('Attempt Recorded', { mode: 'triples', target: tpCurrentTarget, rounds });
-        setTpCurrentTarget(generateTriplesTarget());
-        showStatus('💾 Saved', 1000);
-      };
-
-      const saveTriplesSession = () => {
-        if (tpAttempts.length === 0) return;
-
-        const stats = calculateTriplesStats(tpAttempts);
-        const targetData = buildTriplesTargetData(tpAttempts);
-        const duration = Math.round((new Date() - tpSessionStart) / 60000);
-
-        addSession({
-          id: Date.now(),
-          mode: 'triples',
-          startTime: tpSessionStart.toISOString(),
-          endTime: new Date().toISOString(),
-          duration,
-          totalAttempts: stats.total,
-          totalRounds: stats.totalRounds,
-          avgRounds: stats.avgRounds,
-          targetData  // Heat map data
-        });
-
-        trackEvent('Training Session Completed', {
-          mode: 'triples',
-          attempts: stats.total,
-          avgRounds: stats.avgRounds,
-          duration: duration
-        });
-
-        setTpAttempts([]);
-        setTpSessionStart(null);
-        setTpCurrentTarget(generateTriplesTarget());
-        showStatus('📊 Session saved', 1500);
-      };
-
-      // Cricket mode handlers
-      const baseNumbers = [20, 19, 18, 17, 16, 15, 'Bull'];
-      const totalHitsNeeded = 21;
-      const ckCurrentHits = Object.values(ckHits).reduce((sum, count) => sum + count, 0);
-      const ckIsComplete = ckCurrentHits >= totalHitsNeeded;
+    // ============================================================================
+    // CORE MULTIPLAYER 501 COMPONENT - Copy this into main app
+    // ============================================================================
+    const Multiplayer501 = () => {
+      // State management
+      const [view, setView] = useState('menu'); // 'menu', 'create', 'join', 'game'
+      const [playerName, setPlayerName] = useState('');
+      const [teamName, setTeamName] = useState('');
+      const [gameCode, setGameCode] = useState('');
+      const [joinCode, setJoinCode] = useState('');
+      const [gameState, setGameState] = useState(null);
+      const [playerId, setPlayerId] = useState(null);
+      const [scoreInput, setScoreInput] = useState('');
+      const [statusMessage, setStatusMessage] = useState('');
       
-      const ckNumbers = useMemo(() => {
-        const open = baseNumbers.filter(num => ckHits[num] < 3);
-        const closed = baseNumbers.filter(num => ckHits[num] >= 3);
-        return [...open, ...closed];
-      }, [ckHits]);
+      const gameRef = useRef(null);
 
-      useEffect(() => {
-        if (ckIsComplete && ckGameStart && ckTotalThrows > 0) {
-          const now = new Date();
-          const game = {
-            throws: ckTotalThrows,
-            timestamp: now.toLocaleTimeString(),
-            date: now.toLocaleDateString()
-          };
-          
-          const newGames = [game, ...ckCompletedGames];
-          setCkCompletedGames(newGames);
-          
-          const duration = Math.round((now - ckGameStart) / 60000) || 1;
-          const missRate = ckTotalThrows > 0 ? Math.round((ckMissCount / ckTotalThrows) * 100) : 0;
-          
-          // Calculate TB% (Triple and Bull percentage)
-          const triplesCount = Object.entries(ckTargetData)
-            .filter(([num]) => num !== 'Bull')
-            .reduce((sum, [_, data]) => sum + (data.triples || 0), 0);
-          const singleBulls = ckTargetData.Bull?.singles || 0;
-          const doubleBulls = ckTargetData.Bull?.doubles || 0;
-          const tbCount = triplesCount + singleBulls + doubleBulls;
-          const tbRate = ckTotalThrows > 0 ? Math.round((tbCount / ckTotalThrows) * 100) : 0;
-          
-          addSession({
-            id: Date.now(),
-            mode: 'cricket',
-            startTime: ckGameStart.toISOString(),
-            endTime: now.toISOString(),
-            duration,
-            throws: ckTotalThrows,
-            missRate: missRate,  // Miss% - already calculated
-            tbRate: tbRate,      // TB% - triples and bulls percentage
-            targetData: ckTargetData  // Heat map data
-          });
-          
-          showStatus('🎯 Game Complete! Starting new game...', 2000);
-          
-          setTimeout(() => {
-            setCkHits({ 20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, Bull: 0 });
-            setCkTotalThrows(0);
-            setCkMissCount(0);
-            setCkGameStart(null);
-            setCkPendingSelections([]);
-            setCkTargetData({});  // Reset target data for new game
-          }, 2000);
-        }
-      }, [ckIsComplete, ckGameStart, ckTotalThrows]);
+      // Constants
+      const MAX_PLAYER_NAME = 20;
+      const MAX_TEAM_NAME = 25;
 
-      const handleCricketPendingHit = (number, count) => {
-        if (ckPendingSelections.length >= 3) return;
-        const remainingHits = 3 - ckHits[number];
-        const actualHits = Math.min(count, remainingHits);
-        if (actualHits > 0) {
-          setCkPendingSelections(prev => [...prev, { number, count: actualHits, type: 'hit' }]);
-        }
-      };
-
-      const handleCricketPendingMiss = () => {
-        if (ckPendingSelections.length >= 3) return;
-        setCkPendingSelections(prev => [...prev, { type: 'miss' }]);
-      };
-
-      const handleCricketSubmit = () => {
-        if (ckPendingSelections.length === 0) return;
-        if (!ckGameStart) setCkGameStart(new Date());
-        
-        const newHits = { ...ckHits };
-        const missCount = ckPendingSelections.filter(s => s.type === 'miss').length;
-        
-        // Track targetData for heat map analysis
-        const newTargetData = { ...ckTargetData };
-        
-        ckPendingSelections.forEach(selection => {
-          if (selection.type === 'hit') {
-            newHits[selection.number] = Math.min(3, newHits[selection.number] + selection.count);
-            
-            // Track what type of hit (single/double/triple)
-            const num = selection.number;
-            if (!newTargetData[num]) {
-              newTargetData[num] = { singles: 0, doubles: 0, triples: 0 };
-            }
-            
-            if (selection.count === 1) {
-              newTargetData[num].singles++;
-            } else if (selection.count === 2) {
-              newTargetData[num].doubles++;
-            } else if (selection.count === 3) {
-              newTargetData[num].triples++;
-            }
-          }
-        });
-        
-        setCkHits(newHits);
-        setCkTargetData(newTargetData);
-        setCkTotalThrows(prev => prev + ckPendingSelections.length);
-        setCkMissCount(prev => prev + missCount);
-        setCkPendingSelections([]);
-        showStatus('✓ Saved', 800);
-      };
-
-      const handleCricketClear = () => {
-        setCkPendingSelections([]);
-      };
-
-      const handleCricketNewGame = () => {
-        setCkHits({ 20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, Bull: 0 });
-        setCkTotalThrows(0);
-        setCkMissCount(0);
-        setCkGameStart(null);
-        setCkPendingSelections([]);
-        showStatus('🎯 New game started', 1000);
-      };
-
-      const ckGetRemainingHits = (num) => {
-        return Math.max(0, 3 - ckHits[num]);
-      };
-
-      const ckIsPending = (number, count) => {
-        return ckPendingSelections.some(s => s.type === 'hit' && s.number === number && s.count === count);
-      };
-
-      const ckIsMissPending = ckPendingSelections.some(s => s.type === 'miss');
-
-      useEffect(() => {
-        if (currentMode === 'double-out' && !doCurrentTarget) {
-          setDoCurrentTarget(generateDoubleOutTarget());
-        }
-        if (currentMode === 'triples' && !tpCurrentTarget) {
-          setTpCurrentTarget(generateTriplesTarget());
-        }
-      }, [currentMode, doCurrentTarget, tpCurrentTarget]);
-
-      const clearAllData = () => {
-        setDiAttempts([]);
-        setDiSessionStart(null);
-        setDoAttempts([]);
-        setDoSessionStart(null);
-        setDoConsecutiveFails(0);
-        setTpAttempts([]);
-        setTpSessionStart(null);
-        setCkHits({ 20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, Bull: 0 });
-        setCkTotalThrows(0);
-        setCkMissCount(0);
-        setCkGameStart(null);
-        setCkCompletedGames([]);
-        setCkPendingSelections([]);
-        clearSessions();
-        setConfirmClear(false);
-        showStatus('🧹 All data cleared');
-      };
-
-      const getCurrentAttempts = () => {
-        if (currentMode === 'double-in') return diAttempts;
-        if (currentMode === 'double-out') return doAttempts;
-        if (currentMode === 'triples') return tpAttempts;
-        return [];
-      };
-
-      const getCurrentStats = () => {
-        if (currentMode === 'double-in') return calculateStats(diAttempts);
-        if (currentMode === 'double-out') return calculateStats(doAttempts);
-        if (currentMode === 'triples') return calculateTriplesStats(tpAttempts);
-        if (currentMode === 'cricket') return calculateCricketStats(ckCompletedGames);
-        return { total: 0, successes: 0, failures: 0, successRate: 0 };
-      };
-
+      // Styling
       const goldGradient = {
         background: 'linear-gradient(45deg, #ffd700, #ffed4a)',
         WebkitBackgroundClip: 'text',
-        WebkitTextFillColor: 'transparent'
+        WebkitTextFillColor: 'transparent',
+        fontWeight: 'bold'
       };
 
-      const btnStyle = "font-black py-4 px-4 rounded-lg text-lg transition-all transform hover:scale-105 shadow-lg";
+      // Utility functions
+      const generateGameCode = () => {
+        return Math.floor(1000 + Math.random() * 9000).toString();
+      };
 
-      return (
-        <div className="min-h-screen bg-black text-white p-4" style={{background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)'}}>
-          <div className="max-w-md mx-auto">
-            
-            {/* HEADER */}
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold mb-2" style={goldGradient}>Darts training app</h1>
+      const calculate3DA = (history) => {
+        if (!history || history.length === 0) return '0.00';
+        const total = history.reduce((sum, score) => {
+          return sum + (score === 'BUST' ? 0 : score);
+        }, 0);
+        return (total / history.length).toFixed(2);
+      };
+
+      const calculateScoreFromHistory = (history) => {
+        if (!history || history.length === 0) return 501;
+        const total = history.reduce((sum, score) => {
+          return sum + (score === 'BUST' ? 0 : score);
+        }, 0);
+        return 501 - total;
+      };
+
+      const showStatus = (msg, timeout = 2000) => {
+        setStatusMessage(msg);
+        setTimeout(() => setStatusMessage(''), timeout);
+      };
+
+      // Firebase functions
+      const createGame = () => {
+        if (!playerName.trim()) {
+          showStatus('⚠️ Please enter your name');
+          return;
+        }
+
+        const code = generateGameCode();
+        const gameData = {
+          code: code,
+          player1: {
+            name: playerName,
+            team: teamName || '',
+            score: 501,
+            previousScore: 501,
+            history: []
+          },
+          player2: null,
+          currentPlayer: 'player1',
+          lastPlayer: null,
+          turn: 1,
+          status: 'waiting',
+          createdAt: Date.now()
+        };
+
+        database.ref(`games/${code}`).set(gameData).then(() => {
+          setGameCode(code);
+          setPlayerId('player1');
+          setView('game');
+          listenToGame(code);
+          showStatus('🎯 Game created!');
+        }).catch(err => {
+          showStatus('❌ Error creating game');
+          console.error(err);
+        });
+      };
+
+      const joinGame = () => {
+        if (!playerName.trim()) {
+          showStatus('⚠️ Please enter your name');
+          return;
+        }
+        if (!joinCode.trim()) {
+          showStatus('⚠️ Please enter game code');
+          return;
+        }
+
+        database.ref(`games/${joinCode}`).once('value').then(snapshot => {
+          const game = snapshot.val();
+          
+          if (!game) {
+            showStatus('❌ Game not found');
+            return;
+          }
+          
+          if (game.status === 'finished') {
+            showStatus('❌ Game has ended');
+            return;
+          }
+          
+          if (game.status === 'abandoned') {
+            showStatus('❌ Game was abandoned');
+            return;
+          }
+          
+          if (game.player2) {
+            showStatus('❌ Game is full');
+            return;
+          }
+
+          // Join as player 2
+          database.ref(`games/${joinCode}/player2`).set({
+            name: playerName,
+            team: teamName || '',
+            score: 501,
+            previousScore: 501,
+            history: []
+          }).then(() => {
+            database.ref(`games/${joinCode}/status`).set('playing');
+            setGameCode(joinCode);
+            setPlayerId('player2');
+            setView('game');
+            listenToGame(joinCode);
+            showStatus('🎯 Joined game!');
+          });
+        }).catch(err => {
+          showStatus('❌ Error joining game');
+          console.error(err);
+        });
+      };
+
+      const listenToGame = (code) => {
+        gameRef.current = database.ref(`games/${code}`);
+        gameRef.current.on('value', (snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+            setGameState(data);
+          }
+        });
+      };
+
+      const recordScore = () => {
+        if (!scoreInput || scoreInput === '0') return;
+        
+        const points = parseInt(scoreInput);
+        if (points > 180) {
+          showStatus('❌ Maximum score is 180');
+          return;
+        }
+
+        const player = gameState[gameState.currentPlayer];
+        const newScore = player.score - points;
+
+        if (newScore < 0) {
+          showStatus('❌ Score would go below 0 - BUST!');
+          return;
+        }
+
+        const newHistory = [...(player.history || []), points];
+        const updates = {};
+        updates[`${gameState.currentPlayer}/score`] = newScore;
+        updates[`${gameState.currentPlayer}/previousScore`] = player.score;
+        updates[`${gameState.currentPlayer}/history`] = newHistory;
+        updates['lastPlayer'] = gameState.currentPlayer;
+
+        // Check for winner
+        if (newScore === 0) {
+          updates['status'] = 'finished';
+        } else {
+          // Switch turns
+          const wasPlayer2 = gameState.currentPlayer === 'player2';
+          updates['currentPlayer'] = gameState.currentPlayer === 'player1' ? 'player2' : 'player1';
+          if (wasPlayer2) {
+            updates['turn'] = gameState.turn + 1;
+          }
+        }
+
+        database.ref(`games/${gameCode}`).update(updates);
+        setScoreInput('');
+      };
+
+      const recordBust = () => {
+        const player = gameState[gameState.currentPlayer];
+        const newHistory = [...(player.history || []), 'BUST'];
+        const updates = {};
+        updates[`${gameState.currentPlayer}/score`] = player.previousScore;
+        updates[`${gameState.currentPlayer}/history`] = newHistory;
+        updates['lastPlayer'] = gameState.currentPlayer;
+
+        // Switch turns
+        const wasPlayer2 = gameState.currentPlayer === 'player2';
+        updates['currentPlayer'] = gameState.currentPlayer === 'player1' ? 'player2' : 'player1';
+        if (wasPlayer2) {
+          updates['turn'] = gameState.turn + 1;
+        }
+
+        database.ref(`games/${gameCode}`).update(updates);
+        setScoreInput('');
+      };
+
+      const undoLastScore = () => {
+        if (!gameState.lastPlayer) return;
+        
+        const lastPlayer = gameState[gameState.lastPlayer];
+        if (!lastPlayer.history || lastPlayer.history.length === 0) return;
+        
+        const newHistory = [...lastPlayer.history];
+        newHistory.pop();
+        
+        const newScore = calculateScoreFromHistory(newHistory);
+        const updates = {};
+        updates[`${gameState.lastPlayer}/score`] = newScore;
+        updates[`${gameState.lastPlayer}/previousScore`] = newScore;
+        updates[`${gameState.lastPlayer}/history`] = newHistory;
+        updates['currentPlayer'] = gameState.lastPlayer;
+        updates['lastPlayer'] = null;
+
+        // Decrement turn if going back to player 2 from player 1's turn
+        if (gameState.currentPlayer === 'player1' && gameState.lastPlayer === 'player2') {
+          updates['turn'] = Math.max(1, gameState.turn - 1);
+        }
+
+        database.ref(`games/${gameCode}`).update(updates);
+      };
+
+      const copyCode = () => {
+        navigator.clipboard.writeText(gameCode).then(() => {
+          showStatus('✅ Code copied to clipboard!');
+        }).catch(() => {
+          showStatus('⚠️ Could not copy code');
+        });
+      };
+
+      const shareViaText = () => {
+        const message = `Join my WB4 Darts game! Code: ${gameCode}`;
+        window.location.href = `sms:?body=${encodeURIComponent(message)}`;
+        showStatus('📱 Opening Messages app...');
+      };
+
+      const leaveGame = () => {
+        if (gameRef.current) {
+          gameRef.current.off();
+        }
+        database.ref(`games/${gameCode}/status`).set('abandoned');
+        setView('menu');
+        setGameState(null);
+        setGameCode('');
+        setPlayerId(null);
+        setScoreInput('');
+      };
+
+      // Cleanup
+      useEffect(() => {
+        return () => {
+          if (gameRef.current) {
+            gameRef.current.off();
+          }
+        };
+      }, []);
+
+      // Render helpers
+      const isMyTurn = gameState && gameState.currentPlayer === playerId;
+      const isGameOver = gameState && gameState.status === 'finished';
+      const canUndo = gameState && gameState.lastPlayer && gameState[gameState.lastPlayer].history && gameState[gameState.lastPlayer].history.length > 0;
+
+      // ============================================================================
+      // RENDER VIEWS
+      // ============================================================================
+
+      // Menu View
+      if (view === 'menu') {
+        return (
+          <div className="min-h-screen bg-black text-white p-4" style={{background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)'}}>
+            <div className="max-w-md mx-auto">
+              <div className="text-center mb-8">
+                <h1 className="text-3xl font-bold mb-2" style={goldGradient}>501 MULTIPLAYER</h1>
+                <p className="text-sm text-gray-400">Play darts with friends in real-time</p>
+              </div>
+
+              <div className="space-y-4">
+                <button 
+                  onClick={() => setView('create')}
+                  className="w-full py-4 rounded-lg font-bold text-white bg-green-600 border-2 border-green-500 hover:bg-green-700 transition-all text-lg"
+                >
+                  🎯 CREATE GAME
+                </button>
+                
+                <button 
+                  onClick={() => setView('join')}
+                  className="w-full py-4 rounded-lg font-bold text-white bg-blue-600 border-2 border-blue-500 hover:bg-blue-700 transition-all text-lg"
+                >
+                  🔗 JOIN GAME
+                </button>
+              </div>
             </div>
+          </div>
+        );
+      }
 
-            {/* MODE NAVIGATION - Vertical on landing, tabs in modes */}
-            {currentMode === null ? (
-              // LANDING PAGE - Vertical stacked buttons
-              <div className="space-y-4 mb-12">
-                {TRAINING_MODES.map((mode) => (
-                  <button
-                    key={mode.id}
-                    onClick={() => handleModeChange(mode.id)}
-                    className="w-full py-6 px-6 rounded-lg text-center transition-all transform hover:scale-105 shadow-xl border-2 border-pink-400 hover:border-pink-300"
-                    style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}
-                  >
-                    <div className="text-2xl font-black" style={goldGradient}>
-                      {mode.label}
-                    </div>
-                  </button>
-                ))}
+      // Create Game View
+      if (view === 'create') {
+        return (
+          <div className="min-h-screen bg-black text-white p-4" style={{background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)'}}>
+            <div className="max-w-md mx-auto">
+              <div className="text-center mb-6">
+                <h1 className="text-2xl font-bold mb-2" style={goldGradient}>CREATE GAME</h1>
               </div>
-            ) : (
-              // ACTIVE MODE - Tab navigation
-              <div className="mb-8">
-                <div className="flex gap-1 bg-gray-900 p-1 rounded-lg border border-gray-800">
-                  {TRAINING_MODES.map((mode) => (
-                    <button
-                      key={mode.id}
-                      onClick={() => handleModeChange(mode.id)}
-                      className={`flex-1 py-3 px-2 rounded-md text-xs font-bold transition-all duration-300 ${
-                        currentMode === mode.id 
-                          ? 'text-black shadow-lg transform scale-105' 
-                          : 'text-gray-400 hover:text-gray-200'
-                      }`}
-                      style={currentMode === mode.id ? 
-                        {background: 'linear-gradient(45deg, #ffd700, #ffed4a)'} :
-                        {background: 'transparent'}
-                      }
-                    >
-                      {mode.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            {/* Content scroll target */}
-            <div ref={contentRef}></div>
-
-            {/* DOUBLE-IN MODE */}
-            {currentMode === 'double-in' && (
-              <>
-                <div className="bg-gray-900 rounded-lg p-8 text-center mb-8 shadow-2xl border-2 border-yellow-500" 
-                     style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
-                  <div className="text-5xl font-black mb-6" style={goldGradient}>GET IN</div>
-                  <p className="text-gray-400 text-sm mb-6">You have three darts to get in. Hit any double and enter your score.</p>
+              <div className="bg-gray-900 rounded-lg p-6 border border-gray-700 mb-6">
+                <div className="mb-4">
+                  <label className="block text-xs text-gray-400 mb-2">
+                    Your Name ({playerName.length}/{MAX_PLAYER_NAME})
+                  </label>
                   <input
-                    type="number"
-                    value={diScoreInput}
-                    onChange={(e) => setDiScoreInput(e.target.value)}
-                    className="text-3xl font-bold text-center bg-gray-800 text-yellow-400 rounded p-3 w-32 border-2 border-yellow-500 focus:border-yellow-300 focus:outline-none"
-                    min="2"
-                    max="170"
+                    type="text"
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    maxLength={MAX_PLAYER_NAME}
+                    className="w-full text-lg font-bold text-center bg-gray-800 text-white rounded p-3 border-2 border-gray-700 focus:border-yellow-500 focus:outline-none"
+                    placeholder="Enter name"
+                  />
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-xs text-gray-400 mb-2">
+                    Team Name ({teamName.length}/{MAX_TEAM_NAME}) - Optional
+                  </label>
+                  <input
+                    type="text"
+                    value={teamName}
+                    onChange={(e) => setTeamName(e.target.value)}
+                    maxLength={MAX_TEAM_NAME}
+                    className="w-full text-base text-center bg-gray-800 text-gray-300 rounded p-3 border-2 border-gray-700 focus:border-yellow-500 focus:outline-none"
+                    placeholder="Enter team"
+                  />
+                </div>
+
+                <button
+                  onClick={createGame}
+                  disabled={!playerName.trim()}
+                  className={`w-full py-3 rounded-lg font-bold text-white transition-all ${
+                    !playerName.trim()
+                      ? 'bg-gray-700 cursor-not-allowed opacity-50'
+                      : 'bg-green-600 hover:bg-green-700'
+                  }`}
+                >
+                  CREATE GAME
+                </button>
+              </div>
+
+              <button
+                onClick={() => setView('menu')}
+                className="w-full py-3 rounded-lg font-bold bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700"
+              >
+                ← BACK
+              </button>
+
+              {statusMessage && (
+                <div className="mt-4 bg-gray-900 rounded-lg p-3 border border-yellow-600 text-center">
+                  <div className="text-sm text-yellow-300 font-semibold">{statusMessage}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      // Join Game View
+      if (view === 'join') {
+        return (
+          <div className="min-h-screen bg-black text-white p-4" style={{background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)'}}>
+            <div className="max-w-md mx-auto">
+              <div className="text-center mb-6">
+                <h1 className="text-2xl font-bold mb-2" style={goldGradient}>JOIN GAME</h1>
+              </div>
+
+              <div className="bg-gray-900 rounded-lg p-6 border border-gray-700 mb-6">
+                <div className="mb-4">
+                  <label className="block text-xs text-gray-400 mb-2">
+                    Your Name ({playerName.length}/{MAX_PLAYER_NAME})
+                  </label>
+                  <input
+                    type="text"
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    maxLength={MAX_PLAYER_NAME}
+                    className="w-full text-lg font-bold text-center bg-gray-800 text-white rounded p-3 border-2 border-gray-700 focus:border-yellow-500 focus:outline-none"
+                    placeholder="Enter name"
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-xs text-gray-400 mb-2">
+                    Team Name ({teamName.length}/{MAX_TEAM_NAME}) - Optional
+                  </label>
+                  <input
+                    type="text"
+                    value={teamName}
+                    onChange={(e) => setTeamName(e.target.value)}
+                    maxLength={MAX_TEAM_NAME}
+                    className="w-full text-base text-center bg-gray-800 text-gray-300 rounded p-3 border-2 border-gray-700 focus:border-yellow-500 focus:outline-none"
+                    placeholder="Enter team"
+                  />
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-xs text-gray-400 mb-2">Game Code</label>
+                  <input
+                    type="text"
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value)}
+                    maxLength={4}
+                    className="w-full text-3xl font-bold text-center bg-gray-800 text-yellow-400 rounded p-3 border-2 border-yellow-500 focus:border-yellow-300 focus:outline-none tracking-widest"
+                    placeholder="0000"
                     inputMode="numeric"
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 mb-8">
-                  <button onClick={() => recordDoubleIn('success')} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
-                    <div className="text-lg mb-1">✅</div>
-                    <div className="text-xs font-bold">GOT IN!</div>
-                  </button>
-                  <button onClick={() => recordDoubleIn('fail')} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
-                    <div className="text-lg mb-1">❌</div>
-                    <div className="text-xs font-bold">MISSED</div>
-                  </button>
-                  <button onClick={saveDoubleInSession} disabled={diAttempts.length === 0} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
-                    <div className="text-lg mb-1">💾</div>
-                    <div className="text-xs font-bold">SAVE</div>
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* DOUBLE-OUT MODE */}
-            {currentMode === 'double-out' && (
-              <>
-                <div className="bg-gray-900 rounded-lg p-8 text-center mb-8 shadow-2xl border-2 border-yellow-500" 
-                     style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
-                  <div className="text-6xl font-black mb-4" style={goldGradient}>
-                    {doCurrentTarget ? `D${doCurrentTarget}` : '...'}
-                  </div>
-                  <p className="text-gray-400 text-sm">This is your out. You have three darts.</p>
-                </div>
-
-                <div className="grid grid-cols-4 gap-2 mb-8">
-                  <button onClick={() => recordDoubleOut('success')} disabled={!doCurrentTarget} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
-                    <div className="text-lg mb-1">✅</div>
-                    <div className="text-xs font-bold">HIT IT!</div>
-                  </button>
-                  <button onClick={() => recordDoubleOut('fail')} disabled={!doCurrentTarget} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
-                    <div className="text-lg mb-1">❌</div>
-                    <div className="text-xs font-bold">MISSED</div>
-                  </button>
-                  <button onClick={() => setDoCurrentTarget(generateDoubleOutTarget())} disabled={!doCurrentTarget} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
-                    <div className="text-lg mb-1">➡️</div>
-                    <div className="text-xs font-bold">SKIP</div>
-                  </button>
-                  <button onClick={saveDoubleOutSession} disabled={doAttempts.length === 0} className={`${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex flex-col items-center justify-center`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
-                    <div className="text-lg mb-1">💾</div>
-                    <div className="text-xs font-bold">SAVE</div>
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* TRIPLES MODE */}
-            {currentMode === 'triples' && (
-              <>
-                <div className="bg-gray-900 rounded-lg p-8 text-center mb-8 shadow-2xl border-2 border-yellow-500" 
-                     style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
-                  <div className="text-6xl font-black mb-4" style={goldGradient}>
-                    {tpCurrentTarget || '...'}
-                  </div>
-                  <p className="text-gray-400 text-sm">This is your triples target. Hit as many as you can.</p>
-                </div>
-
-                {tpCurrentTarget === 'Bull' ? (
-                  <>
-                    <div className="grid grid-cols-3 gap-2 mb-2">
-                      <button onClick={() => recordTriples(0)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>MISS</button>
-                      {[1, 2].map(n => (
-                        <button key={n} onClick={() => recordTriples(n)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>C{n}</button>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-4 gap-2 mb-8">
-                      {[3, 4, 5, 6].map(n => (
-                        <button key={n} onClick={() => recordTriples(n)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>C{n}</button>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-5 gap-2 mb-2">
-                      <button onClick={() => recordTriples(0)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>MISS</button>
-                      {[1, 2, 3, 4].map(n => (
-                        <button key={n} onClick={() => recordTriples(n)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>R{n}</button>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-5 gap-2 mb-8">
-                      {[5, 6, 7, 8, 9].map(n => (
-                        <button key={n} onClick={() => recordTriples(n)} className={`${btnStyle} text-white border-2 border-gray-600 text-xs shadow-xl py-3`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>R{n}</button>
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                <button onClick={saveTriplesSession} disabled={tpAttempts.length === 0} className={`w-full ${btnStyle} text-white border-2 border-gray-600 text-sm shadow-xl flex items-center justify-center mb-8`} style={{background: 'linear-gradient(145deg, #374151, #1f2937)'}}>
-                  <div className="text-lg mr-2">💾</div>
-                  <div className="text-xs font-bold">SAVE SESSION</div>
-                </button>
-              </>
-            )}
-
-            {/* CRICKET MODE */}
-            {currentMode === 'cricket' && (
-              <>
-                <div className="bg-gray-900 rounded-lg p-6 text-center mb-8 shadow-2xl border-2 border-yellow-500" 
-                     style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
-                  <div className="text-4xl font-black mb-4" style={goldGradient}>CLOSE EVERYTHING</div>
-                  <p className="text-gray-400 text-sm mb-2">You're playing cricket with no scoring.</p>
-                  <div className={`text-sm font-bold h-5 ${ckPendingSelections.length >= 3 ? 'text-green-400' : ckPendingSelections.length > 0 ? 'text-blue-400' : 'text-transparent'}`}>
-                    {ckPendingSelections.length > 0 ? (
-                      <>
-                        This Round: {ckPendingSelections.length} dart{ckPendingSelections.length !== 1 ? 's' : ''} selected
-                        {ckPendingSelections.length >= 3 && ' - Ready to Submit!'}
-                      </>
-                    ) : (
-                      'Ready to throw'
-                    )}
-                  </div>
-                </div>
-
-                <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-                  <div className="space-y-3">
-                    {ckNumbers.map((num, index) => {
-                      const remaining = ckGetRemainingHits(num);
-                      const isClosed = remaining === 0;
-                      const isLocked = ckPendingSelections.length >= 3;
-                      const closedCount = ckHits[num];
-                      
-                      // Find the first open number in priority order
-                      const priorityOrder = [20, 19, 18, 17, 16, 15, 'Bull'];
-                      const firstOpenNumber = priorityOrder.find(n => ckHits[n] < 3);
-                      const shouldShowMissSubmit = num === firstOpenNumber;
-                      
-                      if (num === 'Bull') {
-                        return (
-                          <Fragment key={num}>
-                            <div className="flex items-center gap-3">
-                              <div className="flex gap-3 flex-1">
-                                <button
-                                  onClick={() => handleCricketPendingHit('Bull', 1)}
-                                  disabled={isClosed || isLocked}
-                                  className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
-                                    isClosed || isLocked
-                                      ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
-                                      : ckIsPending('Bull', 1)
-                                      ? 'bg-yellow-600 text-white border-yellow-500 scale-105 shadow-lg'
-                                      : 'bg-gray-800 text-yellow-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
-                                  }`}
-                                >
-                                  BULL
-                                </button>
-                                <button
-                                  onClick={() => handleCricketPendingHit('Bull', 2)}
-                                  disabled={isClosed || isLocked}
-                                  className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
-                                    isClosed || isLocked
-                                      ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
-                                      : ckIsPending('Bull', 2)
-                                      ? 'bg-red-600 text-white border-red-500 scale-105 shadow-lg'
-                                      : 'bg-gray-800 text-red-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
-                                  }`}
-                                >
-                                  D-BULL
-                                </button>
-                              </div>
-                              <div className="flex gap-1.5 w-16 justify-between">
-                                {[0, 1, 2].map(idx => (
-                                  <span key={idx} className="text-xs">
-                                    {idx < closedCount ? '🎯' : '🔴'}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                            
-                            {/* Miss/Submit after highest priority open number */}
-                            {shouldShowMissSubmit && (
-                              <div className="flex items-center gap-3">
-                                <div className="flex gap-3 flex-1">
-                                  <button
-                                    onClick={handleCricketPendingMiss}
-                                    disabled={isLocked}
-                                    className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
-                                      isLocked
-                                        ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
-                                        : ckIsMissPending
-                                        ? 'bg-red-600 text-white border-red-500 scale-105 shadow-lg'
-                                        : 'bg-gray-800 text-red-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
-                                    }`}
-                                  >
-                                    ❌ MISS
-                                  </button>
-                                  <button
-                                    onClick={handleCricketSubmit}
-                                    disabled={ckPendingSelections.length === 0}
-                                    className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
-                                      ckPendingSelections.length === 0
-                                        ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed opacity-50'
-                                        : 'bg-green-600 text-white border-2 border-green-400 shadow-lg hover:scale-105'
-                                    }`}
-                                  >
-                                    ✓ SUBMIT {ckPendingSelections.length > 0 && `(${ckPendingSelections.length})`}
-                                  </button>
-                                </div>
-                                <div className="w-16"></div>
-                              </div>
-                            )}
-                          </Fragment>
-                        );
-                      }
-                      
-                      return (
-                        <Fragment key={num}>
-                          <div className="flex items-center gap-3">
-                            <div className="flex gap-3 flex-1">
-                              <button
-                                onClick={() => handleCricketPendingHit(num, 1)}
-                                disabled={isClosed || isLocked}
-                                className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
-                                  isClosed || isLocked
-                                    ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
-                                    : ckIsPending(num, 1)
-                                    ? 'bg-blue-600 text-white border-blue-500 scale-105 shadow-lg'
-                                    : 'bg-gray-800 text-blue-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
-                                }`}
-                              >
-                                {num}
-                              </button>
-                              <button
-                                onClick={() => handleCricketPendingHit(num, 2)}
-                                disabled={isClosed || isLocked}
-                                className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
-                                  isClosed || isLocked
-                                    ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
-                                    : ckIsPending(num, 2)
-                                    ? 'bg-green-600 text-white border-green-500 scale-105 shadow-lg'
-                                    : 'bg-gray-800 text-green-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
-                                }`}
-                              >
-                                D{num}
-                              </button>
-                              <button
-                                onClick={() => handleCricketPendingHit(num, 3)}
-                                disabled={isClosed || isLocked}
-                                className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
-                                  isClosed || isLocked
-                                    ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
-                                    : ckIsPending(num, 3)
-                                    ? 'bg-purple-600 text-white border-purple-500 scale-105 shadow-lg'
-                                    : 'bg-gray-800 text-purple-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
-                                }`}
-                              >
-                                T{num}
-                              </button>
-                            </div>
-                            <div className="flex gap-1.5 w-16 justify-between">
-                              {[0, 1, 2].map(idx => (
-                                <span key={idx} className="text-xs">
-                                  {idx < closedCount ? '🎯' : '🔴'}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                          
-                          {/* Miss/Submit after highest priority open number */}
-                          {shouldShowMissSubmit && (
-                            <div className="flex items-center gap-3">
-                              <div className="flex gap-3 flex-1">
-                                <button
-                                  onClick={handleCricketPendingMiss}
-                                  disabled={isLocked}
-                                  className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
-                                    isLocked
-                                      ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
-                                      : ckIsMissPending
-                                      ? 'bg-red-600 text-white border-red-500 scale-105 shadow-lg'
-                                      : 'bg-gray-800 text-red-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
-                                  }`}
-                                >
-                                  ❌ MISS
-                                </button>
-                                <button
-                                  onClick={handleCricketSubmit}
-                                  disabled={ckPendingSelections.length === 0}
-                                  className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
-                                    ckPendingSelections.length === 0
-                                      ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed opacity-50'
-                                      : 'bg-green-600 text-white border-2 border-green-400 shadow-lg hover:scale-105'
-                                  }`}
-                                >
-                                  ✓ SUBMIT {ckPendingSelections.length > 0 && `(${ckPendingSelections.length})`}
-                                </button>
-                              </div>
-                              <div className="w-16"></div>
-                            </div>
-                          )}
-                        </Fragment>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Clear/New buttons at bottom */}
-                <div className="grid grid-cols-2 gap-2 mb-6">
-                  <button
-                    onClick={handleCricketClear}
-                    disabled={ckPendingSelections.length === 0}
-                    className={`font-black py-3 px-2 rounded-lg text-xs transition-all transform hover:scale-105 shadow-lg ${
-                      ckPendingSelections.length === 0
-                        ? 'bg-gray-800 text-gray-600 border border-gray-700 cursor-not-allowed opacity-50'
-                        : 'bg-gray-800 text-orange-400 border border-gray-700 hover:bg-gray-700'
-                    }`}
-                  >
-                    ↺ CLEAR
-                  </button>
-                  <button
-                    onClick={handleCricketNewGame}
-                    className="font-black py-3 px-2 rounded-lg text-xs transition-all transform hover:scale-105 shadow-lg bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700"
-                  >
-                    🔄 NEW
-                  </button>
-                </div>
-
-                <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
-                  <h3 className="text-lg font-bold mb-3 text-pink-400">📊 STATS</h3>
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <div>
-                      <div className="text-2xl font-bold text-yellow-400">{calculateCricketStats(ckCompletedGames).total}</div>
-                      <div className="text-xs text-gray-300 font-medium">GAMES</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold" style={goldGradient}>{calculateCricketStats(ckCompletedGames).avgThrows}</div>
-                      <div className="text-xs text-gray-300 font-medium">AVG CLOSING SPEED</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-green-400">{calculateCricketStats(ckCompletedGames).bestGame || '-'}</div>
-                      <div className="text-xs text-gray-300 font-medium">BEST GAME</div>
-                    </div>
-                  </div>
-                </div>
-
-                {ckCompletedGames.length > 0 && (
-                  <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
-                    <h3 className="text-lg font-bold mb-3 text-pink-400">🎯 RECENT GAMES</h3>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {ckCompletedGames.slice(0, 10).map((game, i) => (
-                        <div key={i} className="flex justify-between items-center text-sm bg-gray-800 p-2 rounded">
-                          <span className="text-yellow-400 font-semibold">Game #{ckCompletedGames.length - i}</span>
-                          <span className="text-blue-400 font-semibold">Closing Speed: {game.throws}</span>
-                          <span className="text-gray-400 text-xs">{game.timestamp}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* INSIGHTS VIEW */}
-            {currentMode === 'insights' && (() => {
-              const dataSufficiency = calculateDataSufficiency();
-              const regionalAnalysis = calculateRegionalAnalysis();
-              const sortedRegions = Object.entries(regionalAnalysis).sort((a, b) => a[1].score - b[1].score);
-              const weakest = sortedRegions[0];
-              const strongest = sortedRegions[sortedRegions.length - 1];
-
-              return (
-                <>
-                  {!dataSufficiency.hasMinimum ? (
-                    // PROGRESS METER - Not enough data yet
-                    <div className="bg-gray-900 rounded-lg p-6 mb-6 border border-gray-800">
-                      <h3 className="text-base font-bold mb-4 text-pink-400">⚠ NOT ENOUGH DATA FOR RECOMMENDATIONS</h3>
-                      
-                      <p className="text-sm text-gray-300 mb-6">
-                        Good news: You need to throw more darts!<br/><br/>I need more data to provide real advice. Once these thresholds are met, I can tell you what the data says you should work on.
-                      </p>
-                      
-                      <div className="mb-6">
-                        <div className="flex justify-between mb-2">
-                          <span className="text-sm text-gray-300">Total Darts</span>
-                          <span className="text-sm font-bold text-white">{dataSufficiency.totalAttempts} / 360</span>
-                        </div>
-                        <div className="w-full bg-gray-700 rounded-full h-4">
-                          <div 
-                            className={`h-4 rounded-full transition-all ${
-                              dataSufficiency.totalAttempts >= 360 ? 'bg-purple-600' : 'bg-yellow-500'
-                            }`}
-                            style={{width: `${Math.min(100, (dataSufficiency.totalAttempts / 360) * 100)}%`}}
-                          ></div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        {Object.entries(dataSufficiency.regionData).map(([key, attempts]) => (
-                          <div key={key} className="text-sm">
-                            <span className="text-gray-300 capitalize">{regions[key].name}: </span>
-                            <span className={`font-bold ${attempts >= 90 ? 'text-green-400' : 'text-purple-400'}`}>
-                              {attempts >= 90 ? 'Sufficient data' : 'Not sufficient data'}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    // RECOMMENDATION - Enough data
-                    <div className="rounded-lg p-6 border-2" style={{
-                      background: 'linear-gradient(145deg, #374151, #1f2937)',
-                      borderColor: '#fbbf24'
-                    }}>
-                      <h3 className="text-2xl font-bold mb-4 text-pink-400">💡 YOUR PRACTICE FOCUS</h3>
-                      <p className="text-lg text-white mb-6">
-                        The data says you need to work on {weakest[1].name === 'Top' ? 'the top of the board' : 
-                                                           weakest[1].name === 'Right' ? 'the right side of the board' :
-                                                           weakest[1].name === 'Bottom' ? 'the bottom of the board' :
-                                                           'the left side of the board'}. Your efficiency there is {(() => {
-                          const meanScore = sortedRegions.reduce((sum, r) => sum + r[1].score, 0) / sortedRegions.length;
-                          const weakestDiff = ((meanScore - weakest[1].score) / meanScore) * 100;
-                          return weakestDiff.toFixed(0);
-                        })()}% lower than everyplace else on the board.
-                        <br/><br/>
-                        Your strongest area is {strongest[1].name === 'Top' ? 'the top of the board' : 
-                                                strongest[1].name === 'Right' ? 'the right side of the board' :
-                                                strongest[1].name === 'Bottom' ? 'the bottom of the board' :
-                                                'the left side of the board'}, where your efficiency is {(() => {
-                          const meanScore = sortedRegions.reduce((sum, r) => sum + r[1].score, 0) / sortedRegions.length;
-                          const strongestDiff = ((strongest[1].score - meanScore) / meanScore) * 100;
-                          return strongestDiff.toFixed(0);
-                        })()}% greater than the other areas.
-                      </p>
-                      <button 
-                        className="w-full py-3 px-4 rounded-lg font-bold text-base transition-all border-2"
-                        style={{
-                          backgroundColor: '#1f2937',
-                          borderColor: '#fbbf24',
-                          color: '#9ca3af',
-                          cursor: 'not-allowed'
-                        }}
-                        disabled
-                      >
-                        🎯 TARGETED PRACTICE MODE (COMING SOON)
-                      </button>
-                    </div>
-                  )}
-                  
-                  {/* Back button */}
-                  <button
-                    onClick={() => {
-                      handleModeChange(null);
-                      setTimeout(() => {
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }, 50);
-                    }}
-                    className="w-full py-4 px-6 rounded-lg font-bold text-base transition-all transform hover:scale-105 shadow-lg bg-purple-600 text-gray-300 border-2 border-gray-300 hover:bg-purple-700 mt-8"
-                  >
-                    ← BACK TO TRAINING
-                  </button>
-                </>
-              );
-            })()}
-
-            {/* HISTORY VIEW */}
-            {currentMode === 'history' && (
-              <>
-                <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
-                  <h3 className="text-lg font-bold mb-3 text-pink-400">📊 OVERALL STATS</h3>
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div><div className="text-2xl font-bold text-blue-400">{sessions.filter(s => s.mode === 'double-in').length}</div><div className="text-sm text-gray-300 font-medium">DOUBLE-IN</div></div>
-                    <div><div className="text-2xl font-bold text-green-400">{sessions.filter(s => s.mode === 'double-out').length}</div><div className="text-sm text-gray-300 font-medium">DOUBLE-OUT</div></div>
-                    <div><div className="text-2xl font-bold text-purple-400">{sessions.filter(s => s.mode === 'triples').length}</div><div className="text-sm text-gray-300 font-medium">TRIPLES</div></div>
-                    <div><div className="text-2xl font-bold text-pink-400">{sessions.filter(s => s.mode === 'cricket').length}</div><div className="text-sm text-gray-300 font-medium">CRICKET</div></div>
-                  </div>
-                </div>
-
-                {sessions.length > 0 ? (
-                  <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
-                    <h3 className="text-lg font-bold mb-3 text-pink-400">📈 SESSION HISTORY</h3>
-                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {sessions.map((s, idx) => {
-                        const colors = {
-                          'double-in': 'bg-blue-600',
-                          'double-out': 'bg-green-600',
-                          'triples': 'bg-purple-600',
-                          'cricket': 'bg-pink-600'
-                        };
-                        const labels = {
-                          'double-in': 'DOUBLE-IN',
-                          'double-out': 'DOUBLE-OUT',
-                          'triples': 'TRIPLES',
-                          'cricket': 'CRICKET'
-                        };
-                        
-                        const endDateTime = new Date(s.endTime);
-                        const dateStr = endDateTime.toLocaleDateString();
-                        const timeStr = endDateTime.toLocaleTimeString();
-                        
-                        return (
-                          <div key={s.id} className="bg-gray-800 p-3 rounded">
-                            <div className="flex justify-between items-start">
-                              {/* Left side - 3 rows */}
-                              <div className="flex flex-col">
-                                <span className={`${colors[s.mode]} text-white text-xs font-bold px-2 py-1 rounded mb-1 w-fit`}>{labels[s.mode]}</span>
-                                <span className="text-gray-400 text-xs">{dateStr}</span>
-                                <span className="text-gray-400 text-xs">{timeStr}</span>
-                              </div>
-                              {/* Right side - 2 or 3 rows */}
-                              <div className="text-right">
-                                {s.mode === 'cricket' ? (
-                                  <>
-                                    <div className="text-white text-sm font-semibold">Closing Speed: {s.throws} darts</div>
-                                    <div className="text-gray-400 text-xs">{s.missRate || 0}% miss rate</div>
-                                  </>
-                                ) : s.mode === 'triples' ? (
-                                  <>
-                                    <div className="text-white text-sm font-semibold">{s.avgRounds} MPR</div>
-                                    <div className="text-gray-400 text-xs">{s.totalAttempts} attempts</div>
-                                  </>
-                                ) : s.mode === 'double-out' ? (
-                                  <>
-                                    <div className="text-white text-sm font-semibold">{s.successRate}% check-out rate</div>
-                                    <div className="text-gray-400 text-xs">{s.totalAttempts} attempts</div>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div className="text-white text-sm font-semibold">{s.successRate}% double-in rate</div>
-                                    <div className="text-gray-400 text-xs">{s.totalAttempts} attempts</div>
-                                    <div className="text-gray-400 text-xs">avg score: {s.expectedValue}</div>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-3">Your last 100 sessions are saved. Use the same device to practice.</p>
-                  </div>
-                ) : (
-                  <div className="bg-gray-900 rounded-lg p-8 text-center mb-8 border border-gray-800">
-                    <p className="text-gray-400 text-sm">No sessions yet. Complete a training session to see it here!</p>
-                  </div>
-                )}
-
-                <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
-                  <div className="flex items-start mb-3">
-                    <input type="checkbox" id="confirmClear" checked={confirmClear} onChange={(e) => setConfirmClear(e.target.checked)} className="mt-1 mr-3 w-5 h-5 cursor-pointer" />
-                    <label htmlFor="confirmClear" className="text-sm text-gray-300 cursor-pointer">Delete all session history and start again.</label>
-                  </div>
-                  <button onClick={clearAllData} disabled={!confirmClear} className={`w-full font-black py-3 px-6 rounded-lg transition-all border-2 shadow-lg ${confirmClear ? 'bg-pink-600 hover:bg-pink-700 text-white border-pink-500 transform hover:scale-105 cursor-pointer' : 'bg-gray-700 text-gray-500 border-gray-600 cursor-not-allowed opacity-50'}`} style={confirmClear ? {textShadow: '2px 2px 4px rgba(0,0,0,0.8)'} : {}}>
-                    🧹 CLEAR ALL PRACTICE DATA
-                  </button>
-                </div>
-
-                {/* Back button */}
                 <button
-                  onClick={() => {
-                    handleModeChange(null);
-                    setTimeout(() => {
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }, 50);
-                  }}
-                  className="w-full py-4 px-6 rounded-lg font-bold text-base transition-all transform hover:scale-105 shadow-lg bg-purple-600 text-gray-300 border-2 border-gray-300 hover:bg-purple-700 mb-8"
+                  onClick={joinGame}
+                  disabled={!playerName.trim() || !joinCode.trim()}
+                  className={`w-full py-3 rounded-lg font-bold text-white transition-all ${
+                    !playerName.trim() || !joinCode.trim()
+                      ? 'bg-gray-700 cursor-not-allowed opacity-50'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
                 >
-                  ← BACK TO TRAINING
+                  JOIN GAME
                 </button>
-              </>
-            )}
-
-            {/* STATS SECTION - More breathing room */}
-            {(currentMode === 'double-in' || currentMode === 'double-out' || currentMode === 'triples') && (
-              <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
-                <h3 className="text-lg font-bold mb-3 text-pink-400">📊 STATS</h3>
-                {currentMode === 'triples' ? (
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div><div className="text-2xl font-bold text-yellow-400">{getCurrentStats().total}</div><div className="text-sm text-gray-300 font-medium">TOTAL ATTEMPTS</div></div>
-                    <div><div className="text-2xl font-bold" style={goldGradient}>{getCurrentStats().avgRounds}</div><div className="text-sm text-gray-300 font-medium">AVG ROUNDS</div></div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div><div className="text-2xl font-bold text-yellow-400">{getCurrentStats().total}</div><div className="text-sm text-gray-300 font-medium">TOTAL ATTEMPTS</div></div>
-                    <div><div className="text-2xl font-bold" style={goldGradient}>{getCurrentStats().successRate}%</div><div className="text-sm text-gray-300 font-medium">SUCCESS RATE</div></div>
-                    <div><div className="text-2xl font-bold text-green-400">{getCurrentStats().successes}</div><div className="text-sm text-gray-300 font-medium">{currentMode === 'double-out' ? 'GOT OUT' : 'GOT IN'}</div></div>
-                    <div><div className="text-2xl font-bold text-red-400">{getCurrentStats().failures}</div><div className="text-sm text-gray-300 font-medium">MISS</div></div>
-                  </div>
-                )}
               </div>
-            )}
 
-            {/* RECENT ATTEMPTS - More breathing room */}
-            {(currentMode === 'double-in' || currentMode === 'double-out' || currentMode === 'triples') && getCurrentAttempts().length > 0 && (
-              <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
-                <h3 className="text-lg font-bold mb-3 text-pink-400">📝 RECENT {currentMode === 'triples' ? 'THROWS' : currentMode === 'double-out' ? 'ATTEMPTS' : 'INS'}</h3>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {getCurrentAttempts().slice(0, 10).map((a, i) => (
-                    <div key={i} className="flex justify-between items-center text-sm bg-gray-800 p-2 rounded">
-                      <span className="text-yellow-400 font-semibold">
-                        {currentMode === 'triples' ? a.number : currentMode === 'double-out' ? `D${a.number}` : (a.outcome === 'success' && a.score ? `Score: ${a.score}` : 'DOUBLE IN')}
-                      </span>
-                      <span className={`font-semibold ${currentMode === 'triples' ? 'text-blue-400' : a.outcome === 'success' ? 'text-green-400' : 'text-red-400'}`}>
-                        {currentMode === 'triples' ? (a.rounds === 0 ? '❌ MISS' : `✅ ${a.number === 'Bull' ? 'C' : 'R'}${a.rounds}`) : (a.outcome === 'success' ? (currentMode === 'double-out' ? '✅' : '✅ GOT IN') : (currentMode === 'double-out' ? '❌' : '❌ MISSED'))}
-                      </span>
-                      <span className="text-gray-400 text-xs">{a.timestamp}</span>
-                    </div>
-                  ))}
+              <button
+                onClick={() => setView('menu')}
+                className="w-full py-3 rounded-lg font-bold bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700"
+              >
+                ← BACK
+              </button>
+
+              {statusMessage && (
+                <div className="mt-4 bg-gray-900 rounded-lg p-3 border border-yellow-600 text-center">
+                  <div className="text-sm text-yellow-300 font-semibold">{statusMessage}</div>
                 </div>
-              </div>
-            )}
-
-            {/* SAVE STATUS */}
-            {saveStatus && (
-              <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
-                <div className="text-xs text-center text-yellow-300 font-semibold">{saveStatus}</div>
-              </div>
-            )}
-
-            {/* INSIGHTS & HISTORY BUTTONS - Now at bottom, side by side */}
-            {currentMode !== 'history' && currentMode !== 'insights' && currentMode !== null && (
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <button
-                  onClick={() => handleModeChange('insights')}
-                  className="w-full py-4 px-6 rounded-lg font-bold text-base transition-all transform hover:scale-105 shadow-lg bg-purple-600 text-gray-300 border-2 border-gray-300 hover:bg-purple-700"
-                >
-                  💡 INSIGHTS
-                </button>
-                <button
-                  onClick={() => handleModeChange('history')}
-                  className="w-full py-4 px-6 rounded-lg font-bold text-base transition-all transform hover:scale-105 shadow-lg bg-purple-600 text-gray-300 border-2 border-gray-300 hover:bg-purple-700"
-                >
-                  📊 HISTORY
-                </button>
-              </div>
-            )}
-
-            {/* INSIGHTS & HISTORY BUTTONS - On landing page */}
-            {currentMode === null && (
-              <></>
-            )}
-
-            {/* FOOTER */}
-            <div className="text-center mt-12 mb-12">
-              <div className="text-4xl" style={{letterSpacing: '0.5em'}}>🤜👈</div>
-            </div>
-            <div className="text-center text-yellow-400 text-xs font-semibold leading-tight">
-              <p>Developed at Westbury Inn. Flatbush vs. Everybody.</p>
-              <p>All rights reserved.</p>
+              )}
             </div>
           </div>
-        </div>
-      );
+        );
+      }
+
+      // Game View
+      if (view === 'game' && gameState) {
+        const player1 = gameState.player1;
+        const player2 = gameState.player2;
+        const waiting = gameState.status === 'waiting';
+
+        return (
+          <div className="min-h-screen bg-black text-white p-4" style={{background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)'}}>
+            <div className="max-w-md mx-auto">
+              
+              {/* Header */}
+              <div className="text-center mb-6">
+                <h1 className="text-2xl font-bold mb-2" style={goldGradient}>501 MULTIPLAYER</h1>
+                
+                {/* Game Code with Share Buttons */}
+                <div className="bg-gray-900 rounded-lg p-3 border border-yellow-600 mb-2">
+                  <div className="text-xs text-gray-400 mb-1">GAME CODE</div>
+                  <div className="text-3xl font-black tracking-widest mb-3" style={goldGradient}>{gameCode}</div>
+                  
+                  {waiting && (
+                    <>
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <button
+                          onClick={shareViaText}
+                          className="py-2 px-4 rounded-lg font-bold text-sm bg-blue-600 text-white border border-blue-500 hover:bg-blue-700 transition-all"
+                        >
+                          📱 Share via Text
+                        </button>
+                        <button
+                          onClick={copyCode}
+                          className="py-2 px-4 rounded-lg font-bold text-sm bg-purple-600 text-white border border-purple-500 hover:bg-purple-700 transition-all"
+                        >
+                          📋 Copy Code
+                        </button>
+                      </div>
+                      <div className="text-sm text-yellow-400">⏳ Waiting for opponent...</div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Player Scoreboards */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                {/* Player 1 */}
+                <div className={`bg-gray-900 rounded-lg p-4 border-2 transition-all ${
+                  gameState.currentPlayer === 'player1' && !isGameOver
+                    ? 'border-green-500' 
+                    : 'border-gray-700'
+                }`}>
+                  <div className="text-base font-bold text-blue-400 text-center">
+                    {player1.name}
+                    {gameState.currentPlayer === 'player1' && !isGameOver && (
+                      <span className="ml-1 text-green-400">🎯</span>
+                    )}
+                  </div>
+                  {player1.team && (
+                    <div className="text-xs text-gray-400 text-center mb-2">{player1.team}</div>
+                  )}
+                  <div className="text-4xl font-black text-center mb-1" style={goldGradient}>
+                    {player1.score}
+                  </div>
+                  <div className="text-xs text-gray-400 text-center">
+                    3DA: <span className="text-yellow-400 font-bold">{calculate3DA(player1.history)}</span>
+                  </div>
+                </div>
+
+                {/* Player 2 */}
+                <div className={`bg-gray-900 rounded-lg p-4 border-2 transition-all ${
+                  gameState.currentPlayer === 'player2' && !isGameOver
+                    ? 'border-green-500' 
+                    : 'border-gray-700'
+                }`}>
+                  {player2 ? (
+                    <>
+                      <div className="text-base font-bold text-red-400 text-center">
+                        {player2.name}
+                        {gameState.currentPlayer === 'player2' && !isGameOver && (
+                          <span className="ml-1 text-green-400">🎯</span>
+                        )}
+                      </div>
+                      {player2.team && (
+                        <div className="text-xs text-gray-400 text-center mb-2">{player2.team}</div>
+                      )}
+                      <div className="text-4xl font-black text-center mb-1" style={goldGradient}>
+                        {player2.score}
+                      </div>
+                      <div className="text-xs text-gray-400 text-center">
+                        3DA: <span className="text-yellow-400 font-bold">{calculate3DA(player2.history)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="text-base font-bold text-gray-500">---</div>
+                      <div className="text-xs text-gray-600 mt-2">Waiting...</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Winner Display */}
+              {isGameOver && (
+                <div className="bg-gray-900 rounded-lg p-4 border-2 border-yellow-500 text-center mb-6">
+                  <div className="text-xl font-bold text-white">
+                    {player1.score === 0 ? player1.name : player2.name} wins!
+                  </div>
+                </div>
+              )}
+
+              {/* Score Input and Controls */}
+              {!isGameOver && !waiting && (
+                <>
+                  {isMyTurn ? (
+                    <>
+                      {/* Input Row */}
+                      <div className="grid grid-cols-3 gap-3 mb-3 items-end">
+                        <div></div>
+                        <div className="text-center">
+                          <input
+                            type="text"
+                            value={scoreInput}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === '' || /^\d+$/.test(value)) {
+                                setScoreInput(value);
+                              }
+                            }}
+                            className="text-3xl font-bold text-center bg-gray-800 text-yellow-400 rounded p-3 w-full border-2 border-yellow-500 focus:border-yellow-300 focus:outline-none"
+                            inputMode="numeric"
+                            placeholder="0"
+                            maxLength="3"
+                          />
+                        </div>
+                        <div className="text-center pb-3">
+                          <div className="text-xs text-gray-400 mb-1">TURN</div>
+                          <div className="text-2xl font-black text-yellow-400">{gameState.turn}</div>
+                        </div>
+                      </div>
+
+                      {/* Buttons Row */}
+                      <div className="grid grid-cols-3 gap-3 mb-6">
+                        <button 
+                          onClick={recordScore}
+                          disabled={!scoreInput || scoreInput === '0'}
+                          className={`py-3 px-6 rounded-lg font-bold text-white bg-gray-800 border border-gray-700 hover:bg-gray-700 transition-all ${
+                            !scoreInput || scoreInput === '0' ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                        >
+                          SUBMIT
+                        </button>
+                        <button 
+                          onClick={recordBust}
+                          className="py-3 px-6 rounded-lg font-bold text-white bg-gray-800 border border-gray-700 hover:bg-gray-700 transition-all"
+                        >
+                          BUST
+                        </button>
+                        <button 
+                          onClick={undoLastScore}
+                          disabled={!canUndo}
+                          className={`py-3 px-6 rounded-lg font-bold text-white bg-gray-800 border border-gray-700 hover:bg-gray-700 transition-all ${
+                            !canUndo ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                        >
+                          UNDO
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="bg-gray-900 rounded-lg p-6 border border-yellow-600 text-center mb-6">
+                      <div className="text-yellow-400 font-bold text-lg">⏳ Waiting for opponent's turn...</div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Leave Game Button */}
+              <button
+                onClick={leaveGame}
+                className="w-full py-3 rounded-lg font-bold bg-red-900 text-red-300 border border-red-700 hover:bg-red-800 text-sm transition-all"
+              >
+                LEAVE GAME
+              </button>
+
+              {/* Status Messages */}
+              {statusMessage && (
+                <div className="mt-4 bg-gray-900 rounded-lg p-3 border border-yellow-600 text-center">
+                  <div className="text-sm text-yellow-300 font-semibold">{statusMessage}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      return null;
     };
 
-    ReactDOM.render(<WB4DartTrainer />, document.getElementById('root'));
+    // ============================================================================
+    // RENDER APP - This is demo scaffolding, not needed in main app
+    // ============================================================================
+    ReactDOM.render(<Multiplayer501 />, document.getElementById('root'));
   </script>
 </body>
 </html>
