@@ -798,7 +798,7 @@
                 <div className="bg-gray-900 rounded-lg p-8 text-center mb-8 shadow-2xl border-2 border-yellow-500" 
                      style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
                   <div className="text-5xl font-black mb-6" style={goldGradient}>GET IN</div>
-                  <p className="text-gray-400 text-sm mb-6">Hit any double and enter your score.</p>
+                  <p className="text-gray-400 text-sm mb-6">You have three darts to get in. Hit any double and enter your score.</p>
                   <input
                     type="number"
                     value={diScoreInput}
@@ -867,7 +867,7 @@
                   <div className="text-6xl font-black mb-4" style={goldGradient}>
                     {tpCurrentTarget || '...'}
                   </div>
-                  <p className="text-gray-400 text-sm">Here's your target. Hit as many as you can.</p>
+                  <p className="text-gray-400 text-sm">This is your triples target. Hit as many as you can.</p>
                 </div>
 
                 {tpCurrentTarget === 'Bull' ? (
@@ -913,7 +913,7 @@
                 <div className="bg-gray-900 rounded-lg p-6 text-center mb-8 shadow-2xl border-2 border-yellow-500" 
                      style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}>
                   <div className="text-4xl font-black mb-4" style={goldGradient}>CLOSE EVERYTHING</div>
-                  <p className="text-gray-400 text-sm mb-2">You're playing Cricket with no scoring.</p>
+                  <p className="text-gray-400 text-sm mb-2">You're playing cricket with no scoring.</p>
                   <div className={`text-sm font-bold h-5 ${ckPendingSelections.length >= 3 ? 'text-green-400' : ckPendingSelections.length > 0 ? 'text-blue-400' : 'text-transparent'}`}>
                     {ckPendingSelections.length > 0 ? (
                       <>
