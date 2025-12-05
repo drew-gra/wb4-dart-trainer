@@ -307,7 +307,8 @@
       };
 
       const shareViaText = () => {
-        const message = `Join my WB4 Darts game! Code: ${gameCode}`;
+        const appUrl = 'https://www.wb4darts.com/mp';
+        const message = `Join my WB4 Darts game!\n${appUrl}\nCode: ${gameCode}`;
         window.location.href = `sms:?body=${encodeURIComponent(message)}`;
         showStatus('📱 Opening Messages app...');
       };
