@@ -103,10 +103,10 @@
 
       // MODES CONFIGURATION - Only training modes, History moved to bottom
       const TRAINING_MODES = [
-        { id: 'double-in', label: 'DOUBLE-IN' },
-        { id: 'double-out', label: 'DOUBLE-OUT' },
-        { id: 'triples', label: 'TRIPLES' },
-        { id: 'cricket', label: 'CRICKET' }
+        { id: 'double-in', label: 'DOUBLE-IN', description: 'Practice getting into the game with any double' },
+        { id: 'double-out', label: 'DOUBLE-OUT', description: 'Master your checkout doubles with targeted practice' },
+        { id: 'triples', label: 'TRIPLES', description: 'Hit triples consistently to dominate Cricket' },
+        { id: 'cricket', label: 'CRICKET', description: 'Close everything - full Cricket game simulation' }
       ];
 
       // TRACKING HELPER
@@ -119,16 +119,6 @@
       const handleModeChange = (mode) => {
         setCurrentMode(mode);
         trackEvent('Mode Changed', { mode });
-        
-        // Track Insights views with data sufficiency context
-        if (mode === 'insights') {
-          const dataSufficiency = calculateDataSufficiency();
-          trackEvent('Insights Viewed', { 
-            hasRecommendation: dataSufficiency.hasMinimum,
-            totalDarts: dataSufficiency.totalAttempts,
-            confidence: dataSufficiency.confidence
-          });
-        }
       };
 
       // Scroll to content when mode changes (but not on initial load or when going to History/Insights)
@@ -666,13 +656,6 @@
           }
         });
         
-        // Track Cricket engagement
-        trackEvent('Attempt Recorded', { 
-          mode: 'cricket', 
-          darts: ckPendingSelections.length,
-          missCount: missCount
-        });
-        
         setCkHits(newHits);
         setCkTargetData(newTargetData);
         setCkTotalThrows(prev => prev + ckPendingSelections.length);
@@ -761,31 +744,50 @@
             
             {/* HEADER */}
             <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold mb-2" style={goldGradient}>WB4 DART TRAINER</h1>
+              <h1 className="text-3xl font-bold mb-2" style={goldGradient}>Darts training app</h1>
             </div>
 
-            {/* NEW MODE NAVIGATION - Cleaner tabs style */}
-            <div className="mb-8">
-              <div className="flex gap-1 bg-gray-900 p-1 rounded-lg border border-gray-800">
+            {/* MODE NAVIGATION - Vertical on landing, tabs in modes */}
+            {currentMode === null ? (
+              // LANDING PAGE - Vertical stacked buttons
+              <div className="space-y-4 mb-12">
                 {TRAINING_MODES.map((mode) => (
                   <button
                     key={mode.id}
                     onClick={() => handleModeChange(mode.id)}
-                    className={`flex-1 py-3 px-2 rounded-md text-xs font-bold transition-all duration-300 ${
-                      currentMode === mode.id 
-                        ? 'text-black shadow-lg transform scale-105' 
-                        : 'text-gray-400 hover:text-gray-200'
-                    }`}
-                    style={currentMode === mode.id ? 
-                      {background: 'linear-gradient(45deg, #ffd700, #ffed4a)'} :
-                      {background: 'transparent'}
-                    }
+                    className="w-full py-6 px-6 rounded-lg text-center transition-all transform hover:scale-105 shadow-xl border-2 border-pink-400 hover:border-pink-300"
+                    style={{background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'}}
                   >
-                    {mode.label}
+                    <div className="text-2xl font-black" style={goldGradient}>
+                      {mode.label}
+                    </div>
                   </button>
                 ))}
               </div>
-            </div>
+            ) : (
+              // ACTIVE MODE - Tab navigation
+              <div className="mb-8">
+                <div className="flex gap-1 bg-gray-900 p-1 rounded-lg border border-gray-800">
+                  {TRAINING_MODES.map((mode) => (
+                    <button
+                      key={mode.id}
+                      onClick={() => handleModeChange(mode.id)}
+                      className={`flex-1 py-3 px-2 rounded-md text-xs font-bold transition-all duration-300 ${
+                        currentMode === mode.id 
+                          ? 'text-black shadow-lg transform scale-105' 
+                          : 'text-gray-400 hover:text-gray-200'
+                      }`}
+                      style={currentMode === mode.id ? 
+                        {background: 'linear-gradient(45deg, #ffd700, #ffed4a)'} :
+                        {background: 'transparent'}
+                      }
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Content scroll target */}
             <div ref={contentRef}></div>
@@ -1418,7 +1420,7 @@
             )}
 
             {/* INSIGHTS & HISTORY BUTTONS - Now at bottom, side by side */}
-            {currentMode !== 'history' && currentMode !== 'insights' && (
+            {currentMode !== 'history' && currentMode !== 'insights' && currentMode !== null && (
               <div className="grid grid-cols-2 gap-4 mb-8">
                 <button
                   onClick={() => handleModeChange('insights')}
@@ -1435,13 +1437,18 @@
               </div>
             )}
 
+            {/* INSIGHTS & HISTORY BUTTONS - On landing page */}
+            {currentMode === null && (
+              <></>
+            )}
+
             {/* FOOTER */}
             <div className="text-center mt-12 mb-12">
               <div className="text-4xl" style={{letterSpacing: '0.5em'}}>🤜👈</div>
             </div>
             <div className="text-center text-yellow-400 text-xs font-semibold leading-tight">
-              <p>All rights reserved</p>
-              <p>Flatbush vs. Everybody</p>
+              <p>Developed at Westbury Inn. Flatbush vs. Everybody.</p>
+              <p>All rights reserved.</p>
             </div>
           </div>
         </div>
