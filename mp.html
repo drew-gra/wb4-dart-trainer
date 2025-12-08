@@ -3,7 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>501 Multiplayer Demo - WB4 Darts</title>
+  
+  <!-- Primary Meta Tags -->
+  <title>Free Darts Training App - WB4 Darts Multiplayer 501</title>
+  <meta name="title" content="Free Darts Training App - WB4 Darts Multiplayer 501">
+  <meta name="description" content="Free darts training app with multiplayer 501. Practice darts online with real-time scoring, 3-dart average tracking, and compete with friends remotely. Best free darts practice app.">
+  <meta name="keywords" content="free darts training app, darts practice app, multiplayer darts, 501 darts online, darts training, darts scoring app, free darts app, online darts game, darts tracker, 3 dart average">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.wb4darts.com/mp">
+  <meta property="og:title" content="Free Darts Training App - WB4 Darts Multiplayer">
+  <meta property="og:description" content="Free darts training app with multiplayer 501. Practice darts online with real-time scoring and compete with friends remotely.">
+  
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://www.wb4darts.com/mp">
+  <meta property="twitter:title" content="Free Darts Training App - WB4 Darts">
+  <meta property="twitter:description" content="Free darts training app with multiplayer 501. Practice and compete with friends online.">
+  
+  <!-- Additional SEO -->
+  <meta name="author" content="WB4 Darts">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://www.wb4darts.com/mp">
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -32,6 +54,26 @@
       -moz-appearance: textfield;
     }
   </style>
+  
+  <!-- Structured Data for SEO -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "WB4 Darts - Free Darts Training App",
+    "description": "Free darts training app with multiplayer 501. Practice darts online with real-time scoring, 3-dart average tracking, and compete with friends remotely.",
+    "url": "https://www.wb4darts.com/mp",
+    "applicationCategory": "GameApplication",
+    "operatingSystem": "Web Browser",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "featureList": "Multiplayer 501, Real-time scoring, 3-dart average tracking, Remote play, Free to use",
+    "screenshot": "https://www.wb4darts.com/screenshot.png"
+  }
+  </script>
 </head>
 <body>
   <div id="root"></div>
@@ -131,10 +173,17 @@
             history: []
           },
           player2: null,
-          currentPlayer: 'player1',
+          currentPlayer: null, // Will be set after choosing
           lastPlayer: null,
           turn: 1,
           status: 'waiting',
+          matches: [], // Track all completed matches
+          seriesScore: {
+            player1Wins: 0,
+            player2Wins: 0
+          },
+          rematchRequested: false,
+          rematchRequestedBy: null,
           createdAt: Date.now()
         };
 
@@ -191,7 +240,7 @@
             previousScore: 501,
             history: []
           }).then(() => {
-            database.ref(`games/${joinCode}/status`).set('playing');
+            database.ref(`games/${joinCode}/status`).set('choosing'); // Move to choosing state
             setGameCode(joinCode);
             setPlayerId('player2');
             setView('game');
@@ -202,6 +251,74 @@
           showStatus('❌ Error joining game');
           console.error(err);
         });
+      };
+
+      const chooseStartingPlayer = (starter) => {
+        const updates = {};
+        updates['currentPlayer'] = starter;
+        updates['status'] = 'playing';
+        database.ref(`games/${gameCode}`).update(updates);
+        showStatus('🎯 Game starting!');
+      };
+
+      const coinFlip = () => {
+        const starter = Math.random() < 0.5 ? 'player1' : 'player2';
+        const starterName = starter === 'player1' ? gameState.player1.name : gameState.player2.name;
+        showStatus(`🎲 Coin flip: ${starterName} throws first!`, 3000);
+        chooseStartingPlayer(starter);
+      };
+
+      const requestRematch = () => {
+        const updates = {};
+        updates['rematchRequested'] = true;
+        updates['rematchRequestedBy'] = playerId;
+        database.ref(`games/${gameCode}`).update(updates);
+        showStatus('⏳ Waiting for opponent to accept...');
+      };
+
+      const acceptRematch = () => {
+        // Save the completed match
+        const lastWinner = gameState.player1.score === 0 ? 'player1' : 'player2';
+        const loser = lastWinner === 'player1' ? 'player2' : 'player1';
+        
+        const matchResult = {
+          winner: lastWinner,
+          player1Score: gameState.player1.score,
+          player2Score: gameState.player2.score,
+          player1_3DA: calculate3DA(gameState.player1.history),
+          player2_3DA: calculate3DA(gameState.player2.history),
+          turns: gameState.turn,
+          timestamp: Date.now()
+        };
+
+        const newMatches = [...(gameState.matches || []), matchResult];
+        const newSeriesScore = { ...gameState.seriesScore };
+        if (lastWinner === 'player1') {
+          newSeriesScore.player1Wins += 1;
+        } else {
+          newSeriesScore.player2Wins += 1;
+        }
+
+        // Reset for new game - loser goes first
+        const updates = {};
+        updates['player1/score'] = 501;
+        updates['player1/previousScore'] = 501;
+        updates['player1/history'] = [];
+        updates['player2/score'] = 501;
+        updates['player2/previousScore'] = 501;
+        updates['player2/history'] = [];
+        updates['currentPlayer'] = loser; // Loser throws first
+        updates['lastPlayer'] = null;
+        updates['turn'] = 1;
+        updates['status'] = 'playing';
+        updates['matches'] = newMatches;
+        updates['seriesScore'] = newSeriesScore;
+        updates['rematchRequested'] = false;
+        updates['rematchRequestedBy'] = null;
+
+        database.ref(`games/${gameCode}`).update(updates);
+        setScoreInput('');
+        showStatus('🎯 Rematch started!');
       };
 
       const listenToGame = (code) => {
@@ -527,6 +644,9 @@
         const player1 = gameState.player1;
         const player2 = gameState.player2;
         const waiting = gameState.status === 'waiting';
+        const choosing = gameState.status === 'choosing';
+        const seriesScore = gameState.seriesScore || { player1Wins: 0, player2Wins: 0 };
+        const hasSeriesScore = seriesScore.player1Wins > 0 || seriesScore.player2Wins > 0;
 
         return (
           <div className="min-h-screen bg-black text-white p-4" style={{background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)'}}>
@@ -534,7 +654,14 @@
               
               {/* Header */}
               <div className="text-center mb-6">
-                <h1 className="text-2xl font-bold mb-2" style={goldGradient}>501 MULTIPLAYER</h1>
+                <h1 className="text-2xl font-bold mb-2" style={goldGradient}>
+                  501 MULTIPLAYER
+                  {hasSeriesScore && (
+                    <span className="text-base text-gray-400 ml-2">
+                      | Series: {seriesScore.player1Wins}-{seriesScore.player2Wins}
+                    </span>
+                  )}
+                </h1>
                 
                 {/* Game Code with Share Buttons */}
                 <div className="bg-gray-900 rounded-lg p-3 border border-yellow-600 mb-2">
@@ -562,6 +689,41 @@
                   )}
                 </div>
               </div>
+
+              {/* Choosing Starting Player View */}
+              {choosing && playerId === 'player1' && (
+                <div className="bg-gray-900 rounded-lg p-6 border-2 border-yellow-500 mb-6">
+                  <h2 className="text-xl font-bold text-center mb-6" style={goldGradient}>
+                    WHO THROWS FIRST?
+                  </h2>
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => chooseStartingPlayer('player1')}
+                      className="w-full py-4 rounded-lg font-bold text-white bg-blue-600 border-2 border-blue-500 hover:bg-blue-700 transition-all"
+                    >
+                      I'LL THROW FIRST
+                    </button>
+                    <button
+                      onClick={() => chooseStartingPlayer('player2')}
+                      className="w-full py-4 rounded-lg font-bold text-white bg-red-600 border-2 border-red-500 hover:bg-red-700 transition-all"
+                    >
+                      OPPONENT THROWS FIRST
+                    </button>
+                    <button
+                      onClick={coinFlip}
+                      className="w-full py-4 rounded-lg font-bold text-white bg-yellow-600 border-2 border-yellow-500 hover:bg-yellow-700 transition-all"
+                    >
+                      🎲 COIN FLIP
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {choosing && playerId === 'player2' && (
+                <div className="bg-gray-900 rounded-lg p-6 border border-yellow-600 text-center mb-6">
+                  <div className="text-yellow-400 font-bold text-lg">⏳ Waiting for opponent to choose who throws first...</div>
+                </div>
+              )}
 
               {/* Player Scoreboards */}
               <div className="grid grid-cols-2 gap-4 mb-6">
@@ -621,17 +783,42 @@
                 </div>
               </div>
 
-              {/* Winner Display */}
+              {/* Winner Display with Rematch */}
               {isGameOver && (
                 <div className="bg-gray-900 rounded-lg p-4 border-2 border-yellow-500 text-center mb-6">
-                  <div className="text-xl font-bold text-white">
+                  <div className="text-xl font-bold text-white mb-3">
                     {player1.score === 0 ? player1.name : player2.name} wins!
                   </div>
+                  {hasSeriesScore && (
+                    <div className="text-sm text-gray-400 mb-4">
+                      Series: {playerId === 'player1' ? 'You' : player1.name} {seriesScore.player1Wins} - {seriesScore.player2Wins} {playerId === 'player2' ? 'You' : player2.name}
+                    </div>
+                  )}
+                  
+                  {gameState.rematchRequested ? (
+                    gameState.rematchRequestedBy === playerId ? (
+                      <div className="text-yellow-400 font-bold mb-3">⏳ Waiting for opponent to accept rematch...</div>
+                    ) : (
+                      <button
+                        onClick={acceptRematch}
+                        className="w-full py-3 rounded-lg font-bold text-white bg-green-600 border-2 border-green-500 hover:bg-green-700 transition-all mb-2"
+                      >
+                        ✅ ACCEPT REMATCH
+                      </button>
+                    )
+                  ) : (
+                    <button
+                      onClick={requestRematch}
+                      className="w-full py-3 rounded-lg font-bold text-white bg-blue-600 border-2 border-blue-500 hover:bg-blue-700 transition-all mb-2"
+                    >
+                      🔄 REMATCH
+                    </button>
+                  )}
                 </div>
               )}
 
               {/* Score Input and Controls */}
-              {!isGameOver && !waiting && (
+              {!isGameOver && !waiting && !choosing && (
                 <>
                   {isMyTurn ? (
                     <>
