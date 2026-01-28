@@ -164,12 +164,15 @@ export const First9 = () => {
   // Current instance 3DA (rolling)
   const currentInstance3DA = currentInstanceTurns > 0 
     ? (currentInstanceScore / currentInstanceTurns).toFixed(1) 
-    : '0';
+    : '—';
 
   // Session average (average of completed instance 3DAs)
   const sessionAvg3DA = completedInstances.length > 0
     ? (completedInstances.reduce((sum, avg) => sum + avg, 0) / completedInstances.length).toFixed(1)
-    : '0.0';
+    : '—';
+
+  // Breadcrumbs: current instance turn scores (last N items from sessionTurnScores where N = currentInstanceTurns)
+  const currentInstanceBreadcrumbs = sessionTurnScores.slice(-currentInstanceTurns);
 
   return (
     <>
@@ -180,21 +183,20 @@ export const First9 = () => {
       />
 
       {/* Running 3DA Display */}
-      <div className="text-center mb-6">
-        <div className="text-6xl font-black mb-1" style={GOLD_GRADIENT}>
-          {currentInstanceTurns > 0 ? currentInstance3DA : '0'}
-          {currentInstanceTurns > 0 && (
-            <span className="text-2xl font-bold text-gray-400 ml-2">(3DA)</span>
-          )}
+      <div className="text-center mb-8">
+        <div className="flex items-center justify-center gap-6">
+          <div className="text-6xl font-black" style={GOLD_GRADIENT}>
+            {currentInstance3DA}
+          </div>
+          <div className="text-left">
+            <div className="text-gray-400 text-xs">
+              Turn: <span className="text-white font-semibold">{currentInstanceTurns + 1} of 3</span>
+            </div>
+            <div className="text-gray-400 text-xs">
+              Avg: <span className="text-white font-semibold">{sessionAvg3DA}</span>
+            </div>
+          </div>
         </div>
-        <p className="text-gray-400 text-sm mt-4">
-          You're playing 501 straight-in. These are your first nine.
-        </p>
-        {currentInstanceTurns > 0 && (
-          <p className="text-yellow-400 text-xs mt-2 font-semibold">
-            Turn {currentInstanceTurns} of 3 • Running total: {currentInstanceScore}
-          </p>
-        )}
       </div>
 
       {/* Score Input + Hot Row */}
@@ -216,6 +218,18 @@ export const First9 = () => {
           scores={hotRowScores} 
           onSelect={handleHotRowScore}
         />
+
+        {/* Turn Breadcrumbs */}
+        {currentInstanceBreadcrumbs.length > 0 && (
+          <div className="mt-4 text-center text-sm">
+            {currentInstanceBreadcrumbs.map((score, i) => (
+              <span key={i}>
+                <span className="text-gray-400">{score}</span>
+                {i < currentInstanceBreadcrumbs.length - 1 && <span className="text-gray-700"> → </span>}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Save Button */}
