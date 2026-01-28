@@ -11,13 +11,13 @@ const parseDisplay = (display) => {
 };
 
 export const ScoreInput = ({ 
-  onScore,           // (score: number) => void - called when score is submitted
-  onBust,            // () => void - optional, for Solo501
-  onMiss,            // () => void - optional, for Double modes
-  onHotRowScore,     // (score: number, isCheckout?: boolean) => void - for hot row selections
-  hotRowScores = [], // number[] - scores to show in hot row
-  checkout = null,   // number | null - if set, shows checkout button in hot row
-  mode = 'first9',   // 'first9' | 'solo501' | 'double-in' | 'double-out'
+  onScore,
+  onBust,
+  onMiss,
+  onHotRowScore,
+  hotRowScores = [],
+  checkout = null,
+  mode = 'first9',
   disabled = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -27,19 +27,23 @@ export const ScoreInput = ({
   const hasInput = display.length > 0;
   const isValid = hasInput && isValidThreeDartScore(currentTotal);
 
-  // Determine which contextual buttons to show
+  // Mode-specific: what does the right button do when there's no input?
   const showBust = mode === 'solo501' && onBust;
   const showMiss = (mode === 'double-in' || mode === 'double-out') && onMiss;
 
   const handleOpen = () => {
-    if (!disabled) {
-      setIsOpen(true);
-    }
+    if (!disabled) setIsOpen(true);
   };
 
-  const handleClose = () => {
+  const handleBack = () => {
     setIsOpen(false);
     setDisplay('');
+  };
+
+  const handleUndo = () => {
+    if (!display) return;
+    // Remove last character (digit or +)
+    setDisplay(prev => prev.slice(0, -1));
   };
 
   const handleNumberPress = (num) => {
@@ -48,8 +52,7 @@ export const ScoreInput = ({
     const newDisplay = display + String(num);
     const newTotal = parseDisplay(newDisplay);
     
-    // Don't allow input that would make an impossible score
-    // But allow partial input (e.g., "1" is fine even though final score might be invalid)
+    // Block if it would exceed 180
     if (newTotal > 180) return;
     
     setDisplay(newDisplay);
@@ -60,31 +63,19 @@ export const ScoreInput = ({
     setDisplay(prev => prev + '+');
   };
 
-  const handleClear = () => {
-    setDisplay('');
-  };
-
-  const handleSubmit = () => {
+  const handleEnter = () => {
     if (!isValid) return;
     onScore(currentTotal);
     setDisplay('');
-    setIsOpen(false);
   };
 
-  const handleBust = () => {
-    if (onBust) {
+  const handleMissOrBust = () => {
+    if (showBust && onBust) {
       onBust();
-      setDisplay('');
-      setIsOpen(false);
-    }
-  };
-
-  const handleMiss = () => {
-    if (onMiss) {
+    } else if (showMiss && onMiss) {
       onMiss();
-      setDisplay('');
-      setIsOpen(false);
     }
+    setDisplay('');
   };
 
   const handleHotRowSelect = (score, isCheckout) => {
@@ -95,142 +86,116 @@ export const ScoreInput = ({
     }
   };
 
-  // Collapsed view - tap to open
+  // Collapsed state — minimal prompt
   if (!isOpen) {
     return (
       <button
         onClick={handleOpen}
         disabled={disabled}
-        className={`w-full py-6 rounded-xl border-2 border-dashed transition-all ${
+        className={`w-full py-4 flex items-center justify-center gap-2 transition-all ${
           disabled 
-            ? 'border-gray-700 text-gray-600 cursor-not-allowed'
-            : 'border-yellow-500 text-yellow-400 hover:border-yellow-400 hover:bg-yellow-500/10 active:scale-98'
+            ? 'text-gray-600 cursor-not-allowed'
+            : 'text-yellow-400 hover:text-yellow-300'
         }`}
       >
-        <span className="text-lg font-bold">🧮 TAP TO SCORE</span>
+        <span className="text-2xl">▼</span>
+        <span className="text-sm font-medium">Score</span>
       </button>
     );
   }
 
-  // Validation message
-  const getValidationMessage = () => {
-    if (!hasInput) return null;
-    if (currentTotal > 180) return 'Max score is 180';
-    if (!isValidThreeDartScore(currentTotal)) return `${currentTotal} is not possible with 3 darts`;
-    return null;
-  };
+  // Validation state
+  const isInvalid = hasInput && !isValidThreeDartScore(currentTotal);
 
-  const validationMessage = getValidationMessage();
-
-  // Expanded view
+  // Expanded state
   return (
-    <div className="bg-gray-900 rounded-xl border border-gray-700 overflow-hidden">
-      {/* Score Display with Submit/Close buttons */}
-      <div className="p-4 border-b border-gray-800">
-        <div className="flex items-center justify-between">
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-white p-2 -ml-2 text-xl"
+    <div className="bg-gray-900 rounded-t-xl border border-gray-700 border-b-0 overflow-hidden">
+      {/* Header Row: BACK/UNDO | Display | MISS/ENTER */}
+      <div className="flex items-center border-b border-gray-700">
+        {/* Left button: BACK or UNDO */}
+        <button
+          onClick={hasInput ? handleUndo : handleBack}
+          className="w-20 py-3 text-center font-bold text-sm bg-yellow-500 text-black"
+        >
+          {hasInput ? 'UNDO' : 'BACK'}
+        </button>
+
+        {/* Center: Score display */}
+        <div className="flex-1 py-3 text-center">
+          <div 
+            className="text-2xl font-black"
+            style={hasInput && isValid ? GOLD_GRADIENT : { color: isInvalid ? '#ef4444' : '#666' }}
           >
-            ✕
-          </button>
-          <div className="flex-1 text-center">
-            <div 
-              className="text-3xl font-black min-h-[40px]"
-              style={hasInput && isValid ? GOLD_GRADIENT : { color: hasInput ? '#ef4444' : '#666' }}
-            >
-              {hasInput ? display : '0'}
-            </div>
-            {hasInput && display.includes('+') && (
-              <div className={`text-sm mt-1 ${isValid ? 'text-gray-400' : 'text-red-400'}`}>
-                = {currentTotal}
-              </div>
-            )}
-            {validationMessage && (
-              <div className="text-xs text-red-400 mt-1">
-                {validationMessage}
-              </div>
-            )}
+            {hasInput ? currentTotal : '0'}
           </div>
+          {hasInput && display.includes('+') && (
+            <div className="text-xs text-gray-500">{display}</div>
+          )}
+          {isInvalid && (
+            <div className="text-xs text-red-400">Not possible</div>
+          )}
+        </div>
+
+        {/* Right button: MISS/BUST or ENTER */}
+        {hasInput ? (
           <button
-            onClick={handleSubmit}
+            onClick={handleEnter}
             disabled={!isValid}
-            className={`p-2 -mr-2 text-xl transition-all ${
-              isValid
-                ? 'text-green-400 hover:text-green-300'
-                : 'text-gray-600 cursor-not-allowed'
+            className={`w-20 py-3 text-center font-bold text-sm ${
+              isValid 
+                ? 'bg-green-600 text-white' 
+                : 'bg-gray-700 text-gray-500 cursor-not-allowed'
             }`}
           >
-            ✓
+            ENTER
           </button>
-        </div>
-      </div>
-
-      {/* Number Pad */}
-      <div className="p-3 border-b border-gray-800">
-        <div className="grid grid-cols-3 gap-2">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-            <button
-              key={num}
-              onClick={() => handleNumberPress(num)}
-              className="py-4 rounded-lg font-bold text-xl bg-gray-800 text-white hover:bg-gray-700 active:bg-gray-600 transition-all"
-            >
-              {num}
-            </button>
-          ))}
-          
-          {/* Bottom row: contextual left button, 0, + */}
-          {showBust ? (
-            <button
-              onClick={handleBust}
-              className="py-4 rounded-lg font-bold text-sm bg-red-600 text-white hover:bg-red-500 active:bg-red-400 transition-all"
-            >
-              💥 BUST
-            </button>
-          ) : showMiss ? (
-            <button
-              onClick={handleMiss}
-              className="py-4 rounded-lg font-bold text-sm bg-red-600 text-white hover:bg-red-500 active:bg-red-400 transition-all"
-            >
-              ❌ MISS
-            </button>
-          ) : (
-            <button
-              onClick={handleClear}
-              className="py-4 rounded-lg font-bold text-lg bg-gray-700 text-red-400 hover:bg-gray-600 active:bg-gray-500 transition-all"
-            >
-              C
-            </button>
-          )}
-          
+        ) : (showBust || showMiss) ? (
           <button
-            onClick={() => handleNumberPress(0)}
-            className="py-4 rounded-lg font-bold text-xl bg-gray-800 text-white hover:bg-gray-700 active:bg-gray-600 transition-all"
+            onClick={handleMissOrBust}
+            className="w-20 py-3 text-center font-bold text-sm bg-red-600 text-white"
           >
-            0
+            {showBust ? 'BUST' : 'MISS'}
           </button>
-          
-          <button
-            onClick={handlePlus}
-            className="py-4 rounded-lg font-bold text-xl bg-blue-600 text-white hover:bg-blue-500 active:bg-blue-400 transition-all"
-          >
-            +
-          </button>
-        </div>
-        
-        {/* Clear button when Bust/Miss is shown */}
-        {(showBust || showMiss) && (
-          <button
-            onClick={handleClear}
-            className="w-full mt-2 py-2 rounded-lg font-bold text-sm bg-gray-800 text-gray-400 hover:bg-gray-700 active:bg-gray-600 transition-all"
-          >
-            CLEAR
-          </button>
+        ) : (
+          <div className="w-20 py-3 bg-gray-800" />
         )}
       </div>
 
+      {/* Number Pad */}
+      <div className="grid grid-cols-3">
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+          <button
+            key={num}
+            onClick={() => handleNumberPress(num)}
+            className="py-5 text-xl font-bold text-white bg-gray-800 border-b border-r border-gray-700 active:bg-gray-700 transition-colors"
+          >
+            {num}
+          </button>
+        ))}
+        
+        {/* Bottom row: +, 0, C */}
+        <button
+          onClick={handlePlus}
+          className="py-5 text-xl font-bold text-blue-400 bg-gray-800 border-b border-r border-gray-700 active:bg-gray-700 transition-colors"
+        >
+          +
+        </button>
+        <button
+          onClick={() => handleNumberPress(0)}
+          className="py-5 text-xl font-bold text-white bg-gray-800 border-b border-r border-gray-700 active:bg-gray-700 transition-colors"
+        >
+          0
+        </button>
+        <button
+          onClick={() => setDisplay('')}
+          className="py-5 text-xl font-bold text-red-400 bg-gray-800 border-b border-gray-700 active:bg-gray-700 transition-colors"
+        >
+          C
+        </button>
+      </div>
+
       {/* Hot Row */}
-      <div className="p-3">
+      <div className="p-3 bg-gray-900">
         <HotRow 
           scores={hotRowScores} 
           onSelect={handleHotRowSelect}
