@@ -130,7 +130,7 @@ export const Solo501 = () => {
     const previousDarts = turnHistory.reduce((sum, t) => sum + t.darts, 0);
     const totalDarts = previousDarts + darts;
     const totalTurns = turnHistory.length + 1;
-    const avg3DA = 501 / totalTurns;
+    const avg3DA = (501 / totalDarts) * 3;
 
     const game = {
       darts: totalDarts,
@@ -239,6 +239,9 @@ export const Solo501 = () => {
 
   const isCheckoutRange = remaining <= 170 && isValidCheckout(remaining);
 
+  // Build breadcrumbs from turnHistory (newest-first, so reverse for display)
+  const breadcrumbScores = [...turnHistory].reverse().map(t => ({ score: t.score, bust: t.bust }));
+
   return (
     <>
       {/* Session Saved Overlay */}
@@ -269,9 +272,6 @@ export const Solo501 = () => {
             </div>
           </div>
         </div>
-        <p className="text-gray-400 text-sm mt-2">
-          Straight-in, double-out. Enter your score each turn.
-        </p>
       </div>
 
       {/* Score Input + Hot Row */}
@@ -295,6 +295,20 @@ export const Solo501 = () => {
           checkout={isCheckoutRange ? remaining : null}
         />
 
+        {/* Turn Breadcrumbs */}
+        {breadcrumbScores.length > 0 && (
+          <div className="mt-4 text-center text-sm">
+            {breadcrumbScores.map((turn, i) => (
+              <span key={i}>
+                <span className={turn.bust ? 'text-red-400' : 'text-gray-400'}>
+                  {turn.bust ? '✕' : turn.score}
+                </span>
+                {i < breadcrumbScores.length - 1 && <span className="text-gray-700"> → </span>}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* New Game Button */}
         <div className="mt-6">
           <button
@@ -315,7 +329,7 @@ export const Solo501 = () => {
       {/* Recent Turns */}
       {turnHistory.length > 0 && (
         <RecentList
-          title="📝 RECENT TURNS"
+          title="🔁 RECENT TURNS"
           items={turnHistory.slice(0, 10)}
           renderItem={(turn, i) => (
             <>

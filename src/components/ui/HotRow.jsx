@@ -18,7 +18,7 @@ export const HotRow = ({
   return (
     <div className="flex justify-between items-center w-full">
       {displayScores.map((score, i) => {
-        const isCheckoutButton = checkout && i === 2;
+        const isCheckoutButton = checkout && i === 1;
         
         return (
           <button

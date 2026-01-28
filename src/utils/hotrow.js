@@ -4,7 +4,7 @@
  * First Principles:
  * 1. Scores always display smallest to largest (left to right)
  * 2. Nothing below 26, nothing 27-39 (except checkouts)
- * 3. Center slot (index 2) becomes the checkout when in range
+ * 3. Slot index 1 becomes the checkout when in range
  * 4. 50+ turns required before dynamic adjustment
  * 5. Each score needs 5+ appearances AND 3%+ frequency
  */
@@ -72,7 +72,7 @@ export const getHotRowScores = (sessions) => {
 };
 
 /**
- * Build the display array for Hot Row, optionally with checkout in center
+ * Build the display array for Hot Row, optionally with checkout in slot 1
  * 
  * @param {number[]} scores - Base 5 scores from getHotRowScores
  * @param {number|null} checkout - Remaining score if valid checkout, null otherwise
@@ -82,11 +82,11 @@ export const buildHotRowDisplay = (scores, checkout = null) => {
   const sorted = [...scores].sort((a, b) => a - b);
 
   if (checkout) {
-    // Replace center slot with checkout
+    // Replace slot 1 (second position) with checkout
     return [
       sorted[0],
-      sorted[1],
       checkout,
+      sorted[2],
       sorted[3],
       sorted[4],
     ];
