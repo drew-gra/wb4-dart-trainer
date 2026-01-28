@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSessionStore, useAppStore } from '../../store/gameStore';
 import { calculateStats } from '../../utils/statistics';
 import { trackEvent } from '../../utils/analytics';
+import { getHotRowScores } from '../../utils/hotrow';
 import { ActionButton } from '../ui/Button';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
+import { ScoreInput } from '../ui/ScoreInput';
+import { HotRow } from '../ui/HotRow';
 import { GOLD_GRADIENT } from '../../utils/constants';
 
 const STORAGE_KEY = 'wb4_inprogress_double_in';
@@ -11,12 +14,15 @@ const STORAGE_KEY = 'wb4_inprogress_double_in';
 export const DoubleIn = () => {
   const [attempts, setAttempts] = useState([]);
   const [sessionStart, setSessionStart] = useState(null);
-  const [scoreInput, setScoreInput] = useState('');
-  const [showCalc, setShowCalc] = useState(false);
-  const [calcDisplay, setCalcDisplay] = useState('');
+  const [showScoreInput, setShowScoreInput] = useState(false);
+  const [pendingScore, setPendingScore] = useState(null);
   
   const addSession = useSessionStore(state => state.addSession);
+  const sessions = useSessionStore(state => state.sessions);
   const showStatus = useAppStore(state => state.showStatus);
+
+  // Compute dynamic hot row scores from session history
+  const hotRowScores = useMemo(() => getHotRowScores(sessions), [sessions]);
 
   // Load in-progress session on mount
   useEffect(() => {
@@ -44,61 +50,34 @@ export const DoubleIn = () => {
 
   const stats = calculateStats(attempts);
 
-  const handleCalcToggle = () => {
-    if (showCalc) {
-      // Closing calc - convert to sum
-      try {
-        const parts = calcDisplay.split('+').map(p => parseInt(p.trim()) || 0);
-        const total = parts.reduce((sum, n) => sum + n, 0);
-        setScoreInput(String(Math.min(total, 170)));
-      } catch {
-        setScoreInput('');
-      }
-      setShowCalc(false);
-      setCalcDisplay('');
-    } else {
-      // Opening calc
-      setShowCalc(true);
-      setCalcDisplay('');
-    }
+  const handleScoreFromInput = (score) => {
+    // Score entered via ScoreInput - store it pending GOT IN button
+    setPendingScore(score);
+    setShowScoreInput(false);
   };
 
-  const handleCalcInput = (btn) => {
-    if (btn === 'C') {
-      setCalcDisplay('');
-    } else if (btn === '+') {
-      if (calcDisplay && !calcDisplay.endsWith('+')) {
-        setCalcDisplay(prev => prev + '+');
-      }
-    } else {
-      setCalcDisplay(prev => prev + btn);
-    }
+  const handleHotRowScore = (score) => {
+    // Hot row tap - store pending
+    setPendingScore(score);
+  };
+
+  const handleUndo = () => {
+    if (attempts.length === 0) return;
+    setAttempts(prev => prev.slice(1));
+    showStatus('↩️ Undone', 800);
   };
 
   const recordAttempt = (outcome) => {
-    // Close calculator if open
-    if (showCalc) {
-      try {
-        const parts = calcDisplay.split('+').map(p => parseInt(p.trim()) || 0);
-        const total = parts.reduce((sum, n) => sum + n, 0);
-        setScoreInput(String(Math.min(total, 170)));
-      } catch {
-        setScoreInput('');
-      }
-      setShowCalc(false);
-      setCalcDisplay('');
-    }
-
     const now = new Date();
     const start = attempts.length === 0 ? now : sessionStart;
     if (attempts.length === 0) setSessionStart(now);
 
     let score = null;
-    if (outcome === 'success' && scoreInput) {
-      const val = parseInt(scoreInput);
+    if (outcome === 'success' && pendingScore) {
+      const val = pendingScore;
       if (val >= 2 && val <= 170) {
         score = val;
-        setScoreInput('');
+        setPendingScore(null);
         trackEvent('Score Entered', { score: val, mode: 'double-in' });
       } else {
         showStatus('⚠️ Score must be 2-170', 2000);
@@ -110,6 +89,11 @@ export const DoubleIn = () => {
     setAttempts(prev => [attempt, ...prev]);
     trackEvent('Attempt Recorded', { mode: 'double-in', outcome });
     showStatus('💾 Saved', 1000);
+    
+    // Clear pending score on miss too
+    if (outcome === 'fail') {
+      setPendingScore(null);
+    }
   };
 
   const saveSession = () => {
@@ -144,6 +128,7 @@ export const DoubleIn = () => {
     localStorage.removeItem(STORAGE_KEY);
     setAttempts([]);
     setSessionStart(null);
+    setPendingScore(null);
     showStatus('📊 Session saved', 1500);
   };
 
@@ -157,57 +142,37 @@ export const DoubleIn = () => {
         <p className="text-gray-400 text-sm mb-4">
           You have three darts to get in. Hit any double and enter your score.
         </p>
-        <div className="relative flex items-center justify-center">
-          <input
-            type="text"
-            value={showCalc ? calcDisplay : scoreInput}
-            onChange={(e) => !showCalc && setScoreInput(e.target.value)}
-            readOnly={showCalc}
-            className={`text-center bg-transparent text-yellow-400 border-b-2 border-yellow-500 focus:border-yellow-300 focus:outline-none transition-all ${
-              showCalc 
-                ? 'text-xl font-bold w-48 pb-2' 
-                : 'text-3xl font-bold w-28 pb-2'
-            }`}
-            placeholder="0"
-            inputMode="numeric"
-            maxLength={showCalc ? 20 : 3}
-          />
-          <button
-            onClick={handleCalcToggle}
-            className={`absolute left-1/2 ml-28 p-4 rounded-lg transition-all text-xl ${
-              showCalc 
-                ? 'bg-yellow-500 text-black' 
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
-          >
-            {showCalc ? '✓' : '🧮'}
-          </button>
-        </div>
         
-        {/* Calculator Panel */}
-        {showCalc && (
-          <div className="mt-4">
-            <div className="grid grid-cols-3 gap-2">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 'C', 0, '+'].map((btn, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleCalcInput(String(btn))}
-                  className={`py-3 rounded-lg font-bold text-lg transition-all ${
-                    btn === '+' 
-                      ? 'bg-blue-600 text-white hover:bg-blue-500'
-                      : btn === 'C'
-                      ? 'bg-red-600 text-white hover:bg-red-500'
-                      : 'bg-gray-700 text-white hover:bg-gray-600'
-                  }`}
-                >
-                  {btn}
-                </button>
-              ))}
-            </div>
+        {/* Pending Score Display */}
+        {pendingScore && (
+          <div className="text-2xl font-bold text-yellow-400 mb-4">
+            Score ready: {pendingScore}
           </div>
         )}
       </div>
 
+      {/* Score Input + Hot Row */}
+      <div className="mb-6">
+        <ScoreInput
+          isOpen={showScoreInput}
+          onToggle={() => setShowScoreInput(!showScoreInput)}
+          onScore={handleScoreFromInput}
+          onBack={handleUndo}
+          canUndo={attempts.length > 0}
+          mode="double-in"
+        />
+
+        {/* Spacer */}
+        <div className="h-4"></div>
+
+        {/* Hot Row (always visible) */}
+        <HotRow 
+          scores={hotRowScores} 
+          onSelect={handleHotRowScore}
+        />
+      </div>
+
+      {/* Action Buttons */}
       <div className="grid grid-cols-3 gap-3 mb-8">
         <ActionButton 
           icon="✅" 
@@ -233,7 +198,7 @@ export const DoubleIn = () => {
       </StatsCard>
 
       <RecentList 
-        title="📝 RECENT INS"
+        title="🔁 RECENT INS"
         items={attempts}
         renderItem={(a, i) => (
           <>

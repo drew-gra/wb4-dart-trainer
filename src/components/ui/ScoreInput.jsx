@@ -27,9 +27,10 @@ const parseDisplay = (display) => {
  * @param {boolean} isOpen - Whether calculator is expanded
  * @param {function} onToggle - Toggle open/closed
  * @param {function} onScore - Callback when score is submitted: (score) => void
- * @param {function} onBust - Callback when bust is pressed
+ * @param {function} onBust - Callback when bust is pressed (solo501 only)
  * @param {function} onBack - Callback for back/undo functionality
  * @param {boolean} canUndo - Whether there's history to undo
+ * @param {string} mode - 'solo501' | 'first9' | 'double-in'
  */
 export const ScoreInput = ({ 
   isOpen, 
@@ -37,7 +38,8 @@ export const ScoreInput = ({
   onScore, 
   onBust,
   onBack,
-  canUndo = false
+  canUndo = false,
+  mode = 'solo501'
 }) => {
   const [display, setDisplay] = useState('');
 
@@ -76,12 +78,21 @@ export const ScoreInput = ({
   };
 
   const handleBust = () => {
-    onBust();
-    setDisplay('');
+    if (onBust) {
+      onBust();
+      setDisplay('');
+    }
+  };
+
+  const handleZero = () => {
+    handleNumber(0);
   };
 
   const btnBase = "py-4 text-xl font-bold text-white";
   const grayBg = "bg-gray-800 active:bg-gray-700";
+
+  // Determine middle button behavior based on mode
+  const isSolo501 = mode === 'solo501';
 
   return (
     <div>
@@ -140,14 +151,18 @@ export const ScoreInput = ({
             {hasInput ? (
               <>
                 <button onClick={handleTimes} className={`${btnBase} ${grayBg} border-r border-gray-700`}>×</button>
-                <button onClick={() => handleNumber(0)} className={`${btnBase} ${grayBg} border-r border-gray-700`}>0</button>
+                <button onClick={handleZero} className={`${btnBase} ${grayBg} border-r border-gray-700`}>0</button>
                 <button onClick={handlePlus} className={`${btnBase} ${grayBg}`}>+</button>
               </>
             ) : (
               <>
-                <button onClick={() => handleScore(60)} className={`${btnBase} border-r border-gray-700`} style={PURPLE_GRADIENT}>60</button>
-                <button onClick={handleBust} className={`${btnBase} ${grayBg} border-r border-gray-700`}>Bust</button>
-                <button onClick={() => handleScore(100)} className={`${btnBase}`} style={PURPLE_GRADIENT}>100</button>
+                <button className={`${btnBase} ${grayBg} border-r border-gray-700 cursor-default`}>🤜</button>
+                {isSolo501 ? (
+                  <button onClick={handleBust} className={`${btnBase} ${grayBg} border-r border-gray-700`}>Bust</button>
+                ) : (
+                  <button onClick={handleZero} className={`${btnBase} ${grayBg} border-r border-gray-700`}>0</button>
+                )}
+                <button className={`${btnBase} ${grayBg} cursor-default`}>👈</button>
               </>
             )}
           </div>

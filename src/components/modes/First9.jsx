@@ -6,6 +6,7 @@ import { getHotRowScores } from '../../utils/hotrow';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
 import { SessionSavedOverlay } from '../ui/Overlay';
 import { ScoreInput } from '../ui/ScoreInput';
+import { HotRow } from '../ui/HotRow';
 import { GOLD_GRADIENT } from '../../utils/constants';
 
 const STORAGE_KEY = 'wb4_inprogress_first9';
@@ -20,7 +21,8 @@ export const First9 = () => {
   const [sessionTurnScores, setSessionTurnScores] = useState([]); // All turn scores this session
   const [sessionStart, setSessionStart] = useState(null);
   
-  // Overlay state
+  // UI state
+  const [showScoreInput, setShowScoreInput] = useState(false);
   const [showSavedOverlay, setShowSavedOverlay] = useState(false);
 
   const addSession = useSessionStore(state => state.addSession);
@@ -91,6 +93,33 @@ export const First9 = () => {
     }
 
     trackEvent('Attempt Recorded', { mode: 'first-9', score: turnScore });
+  };
+
+  const handleUndo = () => {
+    if (sessionTurnScores.length === 0) return;
+    
+    const lastScore = sessionTurnScores[sessionTurnScores.length - 1];
+    
+    if (currentInstanceTurns === 0) {
+      // We just completed an instance, need to restore it
+      if (completedInstances.length > 0) {
+        const lastInstance3DA = completedInstances[completedInstances.length - 1];
+        // Restore to turn 2 of 3
+        setCurrentInstanceTurns(2);
+        // Calculate what the score was before the last turn
+        // lastInstance3DA * 3 = total, minus last turn score = previous score
+        const totalInstanceScore = lastInstance3DA * 3;
+        setCurrentInstanceScore(totalInstanceScore - lastScore);
+        setCompletedInstances(prev => prev.slice(0, -1));
+      }
+    } else {
+      // Mid-instance, just subtract the score
+      setCurrentInstanceScore(prev => prev - lastScore);
+      setCurrentInstanceTurns(prev => prev - 1);
+    }
+    
+    setSessionTurnScores(prev => prev.slice(0, -1));
+    showStatus('↩️ Undone', 800);
   };
 
   const handleHotRowScore = (score) => {
@@ -168,13 +197,24 @@ export const First9 = () => {
         )}
       </div>
 
-      {/* Unified Score Input */}
+      {/* Score Input + Hot Row */}
       <div className="mb-6">
         <ScoreInput
-          mode="first9"
+          isOpen={showScoreInput}
+          onToggle={() => setShowScoreInput(!showScoreInput)}
           onScore={handleScore}
-          onHotRowScore={handleHotRowScore}
-          hotRowScores={hotRowScores}
+          onBack={handleUndo}
+          canUndo={sessionTurnScores.length > 0}
+          mode="first9"
+        />
+
+        {/* Spacer */}
+        <div className="h-4"></div>
+
+        {/* Hot Row (always visible) */}
+        <HotRow 
+          scores={hotRowScores} 
+          onSelect={handleHotRowScore}
         />
       </div>
 
@@ -200,7 +240,7 @@ export const First9 = () => {
       </StatsCard>
 
       <RecentList 
-        title="📝 RECENT F9s"
+        title="🔁 RECENT F9s"
         items={[...completedInstances].reverse().map((avg, i) => ({ avg, index: completedInstances.length - i }))}
         renderItem={(item, i) => (
           <>
