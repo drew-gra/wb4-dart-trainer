@@ -5,6 +5,7 @@ import { isValidThreeDartScore } from '../../utils/scoring';
 import { getHotRowScores } from '../../utils/hotrow';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
 import { SessionSavedOverlay, CheckoutOverlay } from '../ui/Overlay';
+import { HotRow } from '../ui/HotRow';
 import { ScoreInput } from '../ui/ScoreInput';
 import { GOLD_GRADIENT } from '../../utils/constants';
 
@@ -20,9 +21,13 @@ const isValidCheckout = (remaining) => {
 };
 
 // Calculate minimum darts needed to checkout
+// Single dart checkouts: 2-40 (even), 50 (bull)
+// Everything else needs at least 2 darts
 const getMinCheckoutDarts = (score) => {
+  // Single dart: even numbers 2-40, or 50 (bull)
   if (score === 50) return 1;
   if (score >= 2 && score <= 40 && score % 2 === 0) return 1;
+  // Everything else needs at least 2 darts
   return 2;
 };
 
@@ -31,6 +36,7 @@ export const Solo501 = () => {
   const [turnHistory, setTurnHistory] = useState([]);
   const [gameStart, setGameStart] = useState(null);
   const [completedGames, setCompletedGames] = useState([]);
+  const [showScoreInput, setShowScoreInput] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [pendingCheckout, setPendingCheckout] = useState(null);
   const [showSavedOverlay, setShowSavedOverlay] = useState(false);
@@ -70,6 +76,28 @@ export const Solo501 = () => {
     }
   }, [remaining, turnHistory, gameStart, completedGames]);
 
+  const handleScoreSubmit = (turnScore) => {
+    if (!gameStart) setGameStart(new Date());
+    
+    if (!isValidThreeDartScore(turnScore)) {
+      showStatus('⚠️ Invalid score', 2000);
+      return;
+    }
+
+    processScore(turnScore);
+  };
+
+  const handleUndo = () => {
+    if (turnHistory.length === 0) return;
+    
+    const lastTurn = turnHistory[0];
+    if (!lastTurn.bust) {
+      setRemaining(prev => prev + lastTurn.score);
+    }
+    setTurnHistory(prev => prev.slice(1));
+    showStatus('↩️ Undone', 800);
+  };
+
   const processScore = (turnScore) => {
     if (!gameStart) setGameStart(new Date());
     
@@ -97,25 +125,16 @@ export const Solo501 = () => {
     trackEvent('Attempt Recorded', { mode: 'solo-501', score: turnScore });
   };
 
-  const handleScore = (turnScore) => {
-    if (!isValidThreeDartScore(turnScore)) {
-      showStatus('⚠️ Invalid score', 2000);
-      return;
-    }
-    processScore(turnScore);
-  };
-
   const handleCheckoutConfirm = (darts) => {
     const turnScore = pendingCheckout.turnScore;
     const previousDarts = turnHistory.reduce((sum, t) => sum + t.darts, 0);
     const totalDarts = previousDarts + darts;
-    
-    // FIXED: Calculate 3DA correctly using total darts, not turns
-    const avg3DA = (501 / totalDarts) * 3;
+    const totalTurns = turnHistory.length + 1;
+    const avg3DA = 501 / totalTurns;
 
     const game = {
       darts: totalDarts,
-      turns: turnHistory.length + 1,
+      turns: totalTurns,
       avg3DA: parseFloat(avg3DA.toFixed(1)),
       timestamp: new Date().toLocaleTimeString()
     };
@@ -126,11 +145,13 @@ export const Solo501 = () => {
     const now = new Date();
     const duration = Math.round((now - gameStart) / 60000) || 1;
 
+    // Collect all turn scores (including final checkout turn)
+    // turnHistory is newest-first, so reverse it and add the final turn
     const turnScores = [...turnHistory]
       .reverse()
       .map(t => t.score)
-      .filter(s => s > 0);
-    turnScores.push(turnScore);
+      .filter(s => s > 0); // Exclude busts (score: 0)
+    turnScores.push(turnScore); // Add the checkout turn
 
     addSession({
       id: Date.now(),
@@ -139,7 +160,7 @@ export const Solo501 = () => {
       endTime: now.toISOString(),
       duration,
       darts: totalDarts,
-      turns: turnHistory.length + 1,
+      turns: totalTurns,
       avg3DA: parseFloat(avg3DA.toFixed(1)),
       turnScores
     });
@@ -147,7 +168,7 @@ export const Solo501 = () => {
     trackEvent('Training Session Completed', {
       mode: 'solo-501',
       darts: totalDarts,
-      turns: turnHistory.length + 1,
+      turns: totalTurns,
       avg3DA: avg3DA.toFixed(1)
     });
 
@@ -163,6 +184,7 @@ export const Solo501 = () => {
   const handleHotRowScore = (score, isCheckout) => {
     if (!gameStart) setGameStart(new Date());
     
+    // If this is the checkout button being tapped, go straight to checkout flow
     if (isCheckout) {
       setPendingCheckout({ turnScore: score, remaining });
       setShowCheckoutModal(true);
@@ -197,6 +219,7 @@ export const Solo501 = () => {
     setRemaining(501);
     setTurnHistory([]);
     setGameStart(null);
+    setShowScoreInput(false);
     
     if (completedGames.length > 0) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ completedGames }));
@@ -206,10 +229,8 @@ export const Solo501 = () => {
     showStatus('🎯 New game started', 1000);
   };
 
-  // FIXED: Calculate current 3DA using darts thrown, not turns
-  const dartsThrown = turnHistory.reduce((sum, t) => sum + t.darts, 0);
-  const current3DA = dartsThrown > 0 
-    ? (((501 - remaining) / dartsThrown) * 3).toFixed(1)
+  const current3DA = turnHistory.length > 0 
+    ? ((501 - remaining) / turnHistory.length).toFixed(1)
     : '—';
 
   const avgDarts = completedGames.length > 0
@@ -234,7 +255,7 @@ export const Solo501 = () => {
       />
 
       {/* Remaining Score Display */}
-      <div className="text-center mb-6">
+      <div className="text-center mb-8">
         <div className="flex items-center justify-center gap-6">
           <div className="text-6xl font-black" style={GOLD_GRADIENT}>
             {remaining}
@@ -253,26 +274,36 @@ export const Solo501 = () => {
         </p>
       </div>
 
-      {/* Unified Score Input */}
+      {/* Score Input + Hot Row */}
       <div className="mb-6">
         <ScoreInput
-          mode="solo501"
-          onScore={handleScore}
+          isOpen={showScoreInput}
+          onToggle={() => setShowScoreInput(!showScoreInput)}
+          onScore={handleScoreSubmit}
           onBust={handleBust}
-          onHotRowScore={handleHotRowScore}
-          hotRowScores={hotRowScores}
+          onBack={handleUndo}
+          canUndo={turnHistory.length > 0}
+        />
+
+        {/* Spacer */}
+        <div className="h-4"></div>
+
+        {/* Hot Row (always visible) */}
+        <HotRow 
+          scores={hotRowScores} 
+          onSelect={handleHotRowScore}
           checkout={isCheckoutRange ? remaining : null}
         />
-      </div>
 
-      {/* New Game Button */}
-      <div className="mb-6">
-        <button
-          onClick={handleNewGame}
-          className="w-full py-3 rounded-lg font-bold transition-all bg-gray-700 text-white hover:bg-gray-600 border border-gray-600"
-        >
-          🔄 NEW GAME
-        </button>
+        {/* New Game Button */}
+        <div className="mt-6">
+          <button
+            onClick={handleNewGame}
+            className="w-full py-3 rounded-lg font-bold transition-all bg-gray-800 text-gray-400 hover:bg-gray-700 border border-gray-700"
+          >
+            <span className="text-sm">🔄 NEW GAME</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats Section */}
