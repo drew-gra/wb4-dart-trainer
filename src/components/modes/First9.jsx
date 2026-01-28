@@ -15,6 +15,7 @@ export const First9 = () => {
   // Current instance state (resets after 3 turns)
   const [currentInstanceScore, setCurrentInstanceScore] = useState(0);
   const [currentInstanceTurns, setCurrentInstanceTurns] = useState(0);
+  const [currentInstanceScores, setCurrentInstanceScores] = useState([]); // Scores for current instance only
   
   // Session state (persists until Save)
   const [completedInstances, setCompletedInstances] = useState([]); // Array of 3DA values
@@ -40,6 +41,7 @@ export const First9 = () => {
         const data = JSON.parse(saved);
         setCurrentInstanceScore(data.currentInstanceScore || 0);
         setCurrentInstanceTurns(data.currentInstanceTurns || 0);
+        setCurrentInstanceScores(data.currentInstanceScores || []);
         setCompletedInstances(data.completedInstances || []);
         setSessionTurnScores(data.sessionTurnScores || []);
         setSessionStart(data.sessionStart ? new Date(data.sessionStart) : null);
@@ -55,12 +57,13 @@ export const First9 = () => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         currentInstanceScore,
         currentInstanceTurns,
+        currentInstanceScores,
         completedInstances,
         sessionTurnScores,
         sessionStart: sessionStart?.toISOString()
       }));
     }
-  }, [currentInstanceScore, currentInstanceTurns, completedInstances, sessionTurnScores, sessionStart]);
+  }, [currentInstanceScore, currentInstanceTurns, currentInstanceScores, completedInstances, sessionTurnScores, sessionStart]);
 
   const handleScore = (turnScore) => {
     // Validate: must be a possible 3-dart score
@@ -77,18 +80,22 @@ export const First9 = () => {
 
     const newInstanceScore = currentInstanceScore + turnScore;
     const newInstanceTurns = currentInstanceTurns + 1;
+    const newInstanceScores = [...currentInstanceScores, turnScore];
 
     if (newInstanceTurns === 3) {
       // Instance complete - calculate 3DA and add to completed instances
       const instance3DA = newInstanceScore / 3;
       setCompletedInstances(prev => [...prev, instance3DA]);
+      // Reset for next instance
       setCurrentInstanceScore(0);
       setCurrentInstanceTurns(0);
+      setCurrentInstanceScores([]);
       showStatus('🎯 First 9 complete!', 1500);
       trackEvent('F9 Instance Completed', { avg3DA: instance3DA.toFixed(1) });
     } else {
       setCurrentInstanceScore(newInstanceScore);
       setCurrentInstanceTurns(newInstanceTurns);
+      setCurrentInstanceScores(newInstanceScores);
       showStatus('💾 Saved', 1000);
     }
 
@@ -107,15 +114,18 @@ export const First9 = () => {
         // Restore to turn 2 of 3
         setCurrentInstanceTurns(2);
         // Calculate what the score was before the last turn
-        // lastInstance3DA * 3 = total, minus last turn score = previous score
         const totalInstanceScore = lastInstance3DA * 3;
         setCurrentInstanceScore(totalInstanceScore - lastScore);
+        // Reconstruct the first two scores from sessionTurnScores
+        const previousScores = sessionTurnScores.slice(-3, -1);
+        setCurrentInstanceScores(previousScores);
         setCompletedInstances(prev => prev.slice(0, -1));
       }
     } else {
       // Mid-instance, just subtract the score
       setCurrentInstanceScore(prev => prev - lastScore);
       setCurrentInstanceTurns(prev => prev - 1);
+      setCurrentInstanceScores(prev => prev.slice(0, -1));
     }
     
     setSessionTurnScores(prev => prev.slice(0, -1));
@@ -155,6 +165,7 @@ export const First9 = () => {
     localStorage.removeItem(STORAGE_KEY);
     setCurrentInstanceScore(0);
     setCurrentInstanceTurns(0);
+    setCurrentInstanceScores([]);
     setCompletedInstances([]);
     setSessionTurnScores([]);
     setSessionStart(null);
@@ -171,9 +182,6 @@ export const First9 = () => {
     ? (completedInstances.reduce((sum, avg) => sum + avg, 0) / completedInstances.length).toFixed(1)
     : '—';
 
-  // Breadcrumbs: current instance turn scores (last N items from sessionTurnScores where N = currentInstanceTurns)
-  const currentInstanceBreadcrumbs = sessionTurnScores.slice(-currentInstanceTurns);
-
   return (
     <>
       {/* Session Saved Overlay */}
@@ -182,18 +190,18 @@ export const First9 = () => {
         onContinue={() => setShowSavedOverlay(false)} 
       />
 
-      {/* Running 3DA Display */}
+      {/* Running Score Display */}
       <div className="text-center mb-8">
         <div className="flex items-center justify-center gap-6">
           <div className="text-6xl font-black" style={GOLD_GRADIENT}>
-            {currentInstance3DA}
+            {currentInstanceScore}
           </div>
           <div className="text-left">
             <div className="text-gray-400 text-xs">
               Turn: <span className="text-white font-semibold">{currentInstanceTurns + 1} of 3</span>
             </div>
             <div className="text-gray-400 text-xs">
-              Avg: <span className="text-white font-semibold">{sessionAvg3DA}</span>
+              3DA: <span className="text-white font-semibold">{currentInstance3DA}</span>
             </div>
           </div>
         </div>
@@ -219,13 +227,13 @@ export const First9 = () => {
           onSelect={handleHotRowScore}
         />
 
-        {/* Turn Breadcrumbs */}
-        {currentInstanceBreadcrumbs.length > 0 && (
+        {/* Turn Breadcrumbs - only show during active instance */}
+        {currentInstanceScores.length > 0 && (
           <div className="mt-4 text-center text-sm">
-            {currentInstanceBreadcrumbs.map((score, i) => (
+            {currentInstanceScores.map((score, i) => (
               <span key={i}>
                 <span className="text-gray-400">{score}</span>
-                {i < currentInstanceBreadcrumbs.length - 1 && <span className="text-gray-700"> → </span>}
+                {i < currentInstanceScores.length - 1 && <span className="text-gray-700"> → </span>}
               </span>
             ))}
           </div>
