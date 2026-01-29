@@ -152,56 +152,30 @@ export const History = ({ onBack }) => {
 
       {/* Session History */}
       {sessions.length > 0 ? (
-        <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
+        <div className="mb-6">
           <h3 className="text-lg font-bold mb-3 text-pink-400">📈 RECENT SESSIONS</h3>
-          <div className="space-y-2 max-h-80 overflow-y-auto">
+          <div className="space-y-1 max-h-80 overflow-y-auto">
             {sessions.map((s) => {
               const endDateTime = new Date(s.endTime);
-              const dateStr = endDateTime.toLocaleDateString();
+              const dateStr = endDateTime.toLocaleDateString([], { month: 'short', day: 'numeric' });
               const timeStr = endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
               
+              let statStr = '';
+              if (s.mode === 'cricket') statStr = `${s.mpr || (63 / s.throws).toFixed(2)} MPR`;
+              else if (s.mode === 'solo-501') statStr = `${s.avg3DA} 3DA`;
+              else if (s.mode === 'triples') statStr = `${s.avgRounds} MPR`;
+              else if (s.mode === 'first-9') statStr = `${s.avg3DA} 3DA`;
+              else statStr = `${s.successRate}%`;
+              
               return (
-                <div key={s.id} className="bg-gray-800 p-3 rounded">
-                  <div className="flex justify-between items-start">
-                    <div className="flex flex-col">
-                      <span className={`${modeColors[s.mode]} text-white text-xs font-bold px-2 py-1 rounded mb-1 w-fit`}>
-                        {modeLabels[s.mode]}
-                      </span>
-                      <span className="text-gray-400 text-xs">{dateStr} {timeStr}</span>
-                    </div>
-                    <div className="text-right">
-                      {s.mode === 'cricket' ? (
-                        <>
-                          <div className="text-white text-sm font-semibold">{s.mpr || (63 / s.throws).toFixed(2)} MPR</div>
-                          <div className="text-green-400 text-xs">{s.score || 0} pts</div>
-                        </>
-                      ) : s.mode === 'solo-501' ? (
-                        <>
-                          <div className="text-white text-sm font-semibold">{s.avg3DA} 3DA</div>
-                          <div className="text-gray-400 text-xs">{s.darts} darts</div>
-                        </>
-                      ) : s.mode === 'triples' ? (
-                        <>
-                          <div className="text-white text-sm font-semibold">{s.avgRounds} MPR</div>
-                          <div className="text-gray-400 text-xs">{s.totalAttempts} rounds</div>
-                        </>
-                      ) : s.mode === 'first-9' ? (
-                        <>
-                          <div className="text-white text-sm font-semibold">{s.avg3DA} 3DA</div>
-                          <div className="text-gray-400 text-xs">{s.totalAttempts} attempts</div>
-                        </>
-                      ) : s.mode === 'double-out' ? (
-                        <>
-                          <div className="text-white text-sm font-semibold">{s.successRate}% out</div>
-                          <div className="text-gray-400 text-xs">{s.totalAttempts} turns</div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="text-white text-sm font-semibold">{s.successRate}% in</div>
-                          <div className="text-gray-400 text-xs">{s.totalAttempts} turns</div>
-                        </>
-                      )}
-                    </div>
+                <div key={s.id} className="flex items-center justify-between py-2 border-b border-gray-800">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full ${modeColors[s.mode]}`}></div>
+                    <span className="text-gray-300 text-sm">{modeLabels[s.mode]}</span>
+                    <span className="text-gray-600 text-xs">{dateStr} {timeStr}</span>
+                  </div>
+                  <div className="text-yellow-400 text-sm font-bold">
+                    {statStr}
                   </div>
                 </div>
               );
