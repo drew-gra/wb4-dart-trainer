@@ -3,6 +3,26 @@ import { useSessionStore, useAppStore } from '../../store/gameStore';
 import { Button } from '../ui/Button';
 import { GOLD_GRADIENT } from '../../utils/constants';
 
+// Calculate total darts thrown across all sessions
+const calculateTotalDarts = (sessions) => {
+  return sessions.reduce((total, s) => {
+    switch (s.mode) {
+      case 'solo-501':
+        return total + (s.darts || 0);
+      case 'cricket':
+        return total + (s.throws || 0);
+      case 'first-9':
+        return total + ((s.totalAttempts || 0) * 9);
+      case 'triples':
+      case 'double-in':
+      case 'double-out':
+        return total + ((s.totalAttempts || 0) * 3);
+      default:
+        return total;
+    }
+  }, 0);
+};
+
 // Calculate unified metrics from sessions
 const calculateUnifiedMetrics = (sessions) => {
   // Double-In %
@@ -49,6 +69,7 @@ export const History = ({ onBack }) => {
   const showStatus = useAppStore(state => state.showStatus);
 
   const metrics = calculateUnifiedMetrics(sessions);
+  const totalDarts = calculateTotalDarts(sessions);
 
   const handleClearAll = () => {
     clearSessions();
@@ -78,7 +99,10 @@ export const History = ({ onBack }) => {
     <>
       {/* Session Counts */}
       <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-        <h3 className="text-lg font-bold mb-3 text-pink-400">📊 SESSIONS</h3>
+        <div className="flex items-baseline justify-between mb-3">
+          <h3 className="text-lg font-bold text-pink-400">📊 SESSIONS</h3>
+          <span className="text-xs text-gray-500">{totalDarts.toLocaleString()} darts</span>
+        </div>
         <div className="grid grid-cols-6 gap-2 text-center">
           <div>
             <div className="text-xl font-bold text-blue-400">
