@@ -17,6 +17,14 @@ const calculateUnifiedMetrics = (sessions) => {
   const doSuccesses = doSessions.reduce((sum, s) => sum + s.successes, 0);
   const doubleOutPct = doTotal > 0 ? Math.round((doSuccesses / doTotal) * 100) : '-';
 
+  // Unified 3DA (from Solo 501 + First 9)
+  const solo501Sessions = sessions.filter(s => s.mode === 'solo-501' && s.avg3DA);
+  const first9Sessions = sessions.filter(s => s.mode === 'first-9' && s.avg3DA);
+  const all3DASessions = [...solo501Sessions, ...first9Sessions];
+  const unified3DA = all3DASessions.length > 0
+    ? (all3DASessions.reduce((sum, s) => sum + s.avg3DA, 0) / all3DASessions.length).toFixed(1)
+    : '-';
+
   // Unified MPR (from Trips + Cricket)
   const tripsSessions = sessions.filter(s => s.mode === 'triples');
   const tripsMarks = tripsSessions.reduce((sum, s) => sum + (parseFloat(s.avgRounds) * s.totalAttempts), 0);
@@ -31,7 +39,7 @@ const calculateUnifiedMetrics = (sessions) => {
   const totalRounds = tripsRounds + cricketRounds;
   const unifiedMPR = totalRounds > 0 ? (totalMarks / totalRounds).toFixed(2) : '-';
 
-  return { doubleInPct, doubleOutPct, unifiedMPR };
+  return { doubleInPct, doubleOutPct, unified3DA, unifiedMPR };
 };
 
 export const History = ({ onBack }) => {
@@ -53,6 +61,7 @@ export const History = ({ onBack }) => {
     'double-out': 'bg-green-600',
     'triples': 'bg-purple-600',
     'first-9': 'bg-orange-600',
+    'solo-501': 'bg-yellow-600',
     'cricket': 'bg-pink-600'
   };
 
@@ -61,6 +70,7 @@ export const History = ({ onBack }) => {
     'double-out': 'DOUBLE-OUT',
     'triples': 'TRIPLES',
     'first-9': 'FIRST 9',
+    'solo-501': 'SOLO 501',
     'cricket': 'CRICKET'
   };
 
@@ -69,7 +79,7 @@ export const History = ({ onBack }) => {
       {/* Session Counts */}
       <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
         <h3 className="text-lg font-bold mb-3 text-pink-400">📊 SESSIONS</h3>
-        <div className="grid grid-cols-5 gap-2 text-center">
+        <div className="grid grid-cols-6 gap-2 text-center">
           <div>
             <div className="text-xl font-bold text-blue-400">
               {sessions.filter(s => s.mode === 'double-in').length}
@@ -86,7 +96,7 @@ export const History = ({ onBack }) => {
             <div className="text-xl font-bold text-purple-400">
               {sessions.filter(s => s.mode === 'triples').length}
             </div>
-            <div className="text-xs text-gray-400">Trips</div>
+            <div className="text-xs text-gray-400">TR</div>
           </div>
           <div>
             <div className="text-xl font-bold text-orange-400">
@@ -95,10 +105,16 @@ export const History = ({ onBack }) => {
             <div className="text-xs text-gray-400">F9</div>
           </div>
           <div>
+            <div className="text-xl font-bold text-yellow-400">
+              {sessions.filter(s => s.mode === 'solo-501').length}
+            </div>
+            <div className="text-xs text-gray-400">S01</div>
+          </div>
+          <div>
             <div className="text-xl font-bold text-pink-400">
               {sessions.filter(s => s.mode === 'cricket').length}
             </div>
-            <div className="text-xs text-gray-400">Cricket</div>
+            <div className="text-xs text-gray-400">SC</div>
           </div>
         </div>
       </div>
@@ -106,22 +122,28 @@ export const History = ({ onBack }) => {
       {/* Universal Metrics */}
       <div className="bg-gray-900 rounded-lg p-4 mb-6 border-2 border-yellow-500">
         <h3 className="text-lg font-bold mb-4 text-pink-400">🎯 YOUR METRICS</h3>
-        <div className="grid grid-cols-3 gap-4 text-center">
+        <div className="grid grid-cols-4 gap-2 text-center">
           <div>
-            <div className="text-xs text-gray-300 font-medium mb-1">DI TURN %</div>
-            <div className="text-3xl font-black" style={GOLD_GRADIENT}>
+            <div className="text-xs text-gray-300 font-medium mb-1">DI %</div>
+            <div className="text-2xl font-black" style={GOLD_GRADIENT}>
               {metrics.doubleInPct}{metrics.doubleInPct !== '-' && '%'}
             </div>
           </div>
           <div>
-            <div className="text-xs text-gray-300 font-medium mb-1">CO TURN %</div>
-            <div className="text-3xl font-black" style={GOLD_GRADIENT}>
+            <div className="text-xs text-gray-300 font-medium mb-1">CO %</div>
+            <div className="text-2xl font-black" style={GOLD_GRADIENT}>
               {metrics.doubleOutPct}{metrics.doubleOutPct !== '-' && '%'}
             </div>
           </div>
           <div>
+            <div className="text-xs text-gray-300 font-medium mb-1">3DA</div>
+            <div className="text-2xl font-black" style={GOLD_GRADIENT}>
+              {metrics.unified3DA}
+            </div>
+          </div>
+          <div>
             <div className="text-xs text-gray-300 font-medium mb-1">MPR</div>
-            <div className="text-3xl font-black" style={GOLD_GRADIENT}>
+            <div className="text-2xl font-black" style={GOLD_GRADIENT}>
               {metrics.unifiedMPR}
             </div>
           </div>
@@ -153,6 +175,11 @@ export const History = ({ onBack }) => {
                           <div className="text-white text-sm font-semibold">{s.mpr || (63 / s.throws).toFixed(2)} MPR</div>
                           <div className="text-green-400 text-xs">{s.score || 0} pts</div>
                         </>
+                      ) : s.mode === 'solo-501' ? (
+                        <>
+                          <div className="text-white text-sm font-semibold">{s.avg3DA} 3DA</div>
+                          <div className="text-gray-400 text-xs">{s.darts} darts</div>
+                        </>
                       ) : s.mode === 'triples' ? (
                         <>
                           <div className="text-white text-sm font-semibold">{s.avgRounds} MPR</div>
@@ -161,7 +188,7 @@ export const History = ({ onBack }) => {
                       ) : s.mode === 'first-9' ? (
                         <>
                           <div className="text-white text-sm font-semibold">{s.avg3DA} 3DA</div>
-                          <div className="text-gray-400 text-xs">{s.totalAttempts} turns</div>
+                          <div className="text-gray-400 text-xs">{s.totalAttempts} attempts</div>
                         </>
                       ) : s.mode === 'double-out' ? (
                         <>
