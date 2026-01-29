@@ -27,7 +27,16 @@ export const Cricket = () => {
   const [showSavedOverlay, setShowSavedOverlay] = useState(false);
   
   const addSession = useSessionStore(state => state.addSession);
+  const sessions = useSessionStore(state => state.sessions);
   const showStatus = useAppStore(state => state.showStatus);
+
+  // Calculate consolidated MPR from all saved cricket sessions
+  const consolidatedMPR = useMemo(() => {
+    const cricketSessions = sessions.filter(s => s.mode === 'cricket' && s.mpr);
+    if (cricketSessions.length === 0) return null;
+    const avg = cricketSessions.reduce((sum, s) => sum + s.mpr, 0) / cricketSessions.length;
+    return avg.toFixed(2);
+  }, [sessions]);
 
   // Load in-progress game on mount
   useEffect(() => {
@@ -267,7 +276,7 @@ export const Cricket = () => {
       <button
         onClick={() => handlePendingHit(number, marksThrown)}
         disabled={isLocked}
-        className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
+        className={`flex-1 py-4 rounded-lg font-bold text-sm transition-all border ${
           isLocked
             ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
             : isActive
@@ -286,7 +295,7 @@ export const Cricket = () => {
         <button
           onClick={handlePendingMiss}
           disabled={isLocked}
-          className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
+          className={`flex-1 py-4 rounded-lg font-bold text-sm transition-all border ${
             isLocked
               ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
               : isMissPending
@@ -299,7 +308,7 @@ export const Cricket = () => {
         <button
           onClick={handleSubmit}
           disabled={pendingSelections.length === 0}
-          className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all border ${
+          className={`flex-1 py-4 rounded-lg font-bold text-sm transition-all border ${
             pendingSelections.length === 0
               ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed opacity-50'
               : 'bg-green-600 text-white border-2 border-green-400 shadow-lg hover:scale-105'
@@ -356,45 +365,49 @@ export const Cricket = () => {
             <div className="text-gray-400 text-xs">
               MPR: <span className="text-white font-semibold">{currentMPR}</span>
             </div>
+            {consolidatedMPR && (
+              <div className="text-gray-400 text-xs">
+                Avg: <span className="text-gray-500 font-semibold">{consolidatedMPR}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-        <div className="space-y-3">
-          {numbers.map((num) => {
-            const shouldShowMissSubmit = num === firstOpenNumber;
-            
-            if (num === 'Bull') {
-              return (
-                <Fragment key={num}>
-                  <div className="flex items-center gap-3">
-                    <div className="flex gap-3 flex-1">
-                      <HitButton number="Bull" marksThrown={1} label="BULL" colorClass="text-yellow-400" activeColorClass="bg-yellow-600 border-yellow-500" />
-                      <HitButton number="Bull" marksThrown={2} label="D-BULL" colorClass="text-red-400" activeColorClass="bg-red-600 border-red-500" />
-                    </div>
-                    <MarksDisplay number="Bull" />
-                  </div>
-                  {shouldShowMissSubmit && <MissSubmitRow />}
-                </Fragment>
-              );
-            }
-            
+      {/* Button Grid - no container */}
+      <div className="space-y-3 mb-6">
+        {numbers.map((num) => {
+          const shouldShowMissSubmit = num === firstOpenNumber;
+          
+          if (num === 'Bull') {
             return (
               <Fragment key={num}>
                 <div className="flex items-center gap-3">
                   <div className="flex gap-3 flex-1">
-                    <HitButton number={num} marksThrown={1} label={String(num)} colorClass="text-blue-400" activeColorClass="bg-blue-600 border-blue-500" />
-                    <HitButton number={num} marksThrown={2} label={`D${num}`} colorClass="text-green-400" activeColorClass="bg-green-600 border-green-500" />
-                    <HitButton number={num} marksThrown={3} label={`T${num}`} colorClass="text-purple-400" activeColorClass="bg-purple-600 border-purple-500" />
+                    <HitButton number="Bull" marksThrown={1} label="BULL" colorClass="text-yellow-400" activeColorClass="bg-yellow-600 border-yellow-500" />
+                    <HitButton number="Bull" marksThrown={2} label="D-BULL" colorClass="text-red-400" activeColorClass="bg-red-600 border-red-500" />
                   </div>
-                  <MarksDisplay number={num} />
+                  <MarksDisplay number="Bull" />
                 </div>
                 {shouldShowMissSubmit && <MissSubmitRow />}
               </Fragment>
             );
-          })}
-        </div>
+          }
+          
+          return (
+            <Fragment key={num}>
+              <div className="flex items-center gap-3">
+                <div className="flex gap-3 flex-1">
+                  <HitButton number={num} marksThrown={1} label={String(num)} colorClass="text-blue-400" activeColorClass="bg-blue-600 border-blue-500" />
+                  <HitButton number={num} marksThrown={2} label={`D${num}`} colorClass="text-green-400" activeColorClass="bg-green-600 border-green-500" />
+                  <HitButton number={num} marksThrown={3} label={`T${num}`} colorClass="text-purple-400" activeColorClass="bg-purple-600 border-purple-500" />
+                </div>
+                <MarksDisplay number={num} />
+              </div>
+              {shouldShowMissSubmit && <MissSubmitRow />}
+            </Fragment>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-2 gap-2 mb-6">

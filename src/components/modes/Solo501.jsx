@@ -48,6 +48,14 @@ export const Solo501 = () => {
   // Compute dynamic hot row scores from session history
   const hotRowScores = useMemo(() => getHotRowScores(sessions), [sessions]);
 
+  // Calculate consolidated 3DA from all saved solo-501 sessions
+  const consolidated3DA = useMemo(() => {
+    const solo501Sessions = sessions.filter(s => s.mode === 'solo-501' && s.avg3DA);
+    if (solo501Sessions.length === 0) return null;
+    const avg = solo501Sessions.reduce((sum, s) => sum + s.avg3DA, 0) / solo501Sessions.length;
+    return avg.toFixed(1);
+  }, [sessions]);
+
   // Load in-progress game on mount
   useEffect(() => {
     try {
@@ -270,6 +278,11 @@ export const Solo501 = () => {
             <div className="text-gray-400 text-xs">
               3DA: <span className="text-white font-semibold">{current3DA}</span>
             </div>
+            {consolidated3DA && (
+              <div className="text-gray-400 text-xs">
+                Avg: <span className="text-gray-500 font-semibold">{consolidated3DA}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
