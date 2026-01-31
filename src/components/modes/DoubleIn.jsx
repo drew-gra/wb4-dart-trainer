@@ -51,7 +51,7 @@ export const DoubleIn = () => {
   const stats = calculateStats(attempts);
 
   const handleGotIn = (score) => {
-    // Score submitted via ScoreInput "Got In" button
+    // Score submitted via ScoreInput = Got In with that score
     if (score < 2 || score > 170) {
       showStatus('⚠️ Score must be 2-170', 2000);
       return;
@@ -64,11 +64,10 @@ export const DoubleIn = () => {
     setAttempts(prev => [attempt, ...prev]);
     trackEvent('Attempt Recorded', { mode: 'double-in', outcome: 'success', score });
     showStatus('💾 Saved', 800);
-    setPendingScore(null);
   };
 
-  const handleBust = () => {
-    // Bust pressed in ScoreInput
+  const handleMissed = () => {
+    // Missed button pressed in ScoreInput
     const now = new Date();
     if (attempts.length === 0) setSessionStart(now);
 
@@ -76,11 +75,10 @@ export const DoubleIn = () => {
     setAttempts(prev => [attempt, ...prev]);
     trackEvent('Attempt Recorded', { mode: 'double-in', outcome: 'fail' });
     showStatus('💾 Saved', 800);
-    setPendingScore(null);
   };
 
   const handleHotRowScore = (score) => {
-    // Hot row tap - store pending, user still needs to confirm
+    // Hot row tap - store pending, user confirms with GOT IN or cancels
     setPendingScore(score);
   };
 
@@ -93,11 +91,11 @@ export const DoubleIn = () => {
   const confirmPendingScore = () => {
     if (!pendingScore) return;
     handleGotIn(pendingScore);
+    setPendingScore(null);
   };
 
   const cancelPendingScore = () => {
     setPendingScore(null);
-    showStatus('❌ Cancelled', 800);
   };
 
   const saveSession = () => {
@@ -177,7 +175,7 @@ export const DoubleIn = () => {
           isOpen={showScoreInput}
           onToggle={() => setShowScoreInput(!showScoreInput)}
           onScore={handleGotIn}
-          onBust={handleBust}
+          onBust={handleMissed}
           onBack={handleUndo}
           canUndo={attempts.length > 0}
           mode="double-in"

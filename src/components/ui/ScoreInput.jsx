@@ -27,7 +27,7 @@ const parseDisplay = (display) => {
  * @param {boolean} isOpen - Whether calculator is expanded
  * @param {function} onToggle - Toggle open/closed
  * @param {function} onScore - Callback when score is submitted: (score) => void
- * @param {function} onBust - Callback when bust/miss is pressed
+ * @param {function} onBust - Callback when bust/missed is pressed
  * @param {function} onBack - Callback for back/undo functionality
  * @param {boolean} canUndo - Whether there's history to undo
  * @param {string} mode - 'solo501' | 'first9' | 'double-in'
@@ -94,6 +94,8 @@ export const ScoreInput = ({
   // Mode checks
   const isSolo501 = mode === 'solo501';
   const isDoubleIn = mode === 'double-in';
+  const showBustButton = isSolo501 || isDoubleIn;
+  const bustLabel = isDoubleIn ? 'Missed' : 'Bust';
 
   return (
     <div>
@@ -110,70 +112,30 @@ export const ScoreInput = ({
       {/* Calculator (collapsible) */}
       {isOpen && (
         <div className="bg-gray-900 rounded-lg border border-gray-800">
-          {/* Header Row - varies by mode */}
+          {/* Header Row: Back | Display | Score */}
           <div className="grid grid-cols-3 text-center border-b border-gray-700">
-            {isDoubleIn ? (
-              <>
-                {/* DI Mode: Bust/Back | Score Display | Got In */}
-                {hasInput ? (
-                  <button 
-                    onClick={handleBack} 
-                    className={`${btnBase} ${grayBg}`}
-                  >
-                    Back
-                  </button>
-                ) : (
-                  <button 
-                    onClick={handleBust} 
-                    className={`${btnBase} ${grayBg}`}
-                  >
-                    Bust
-                  </button>
-                )}
-                <div className={`py-4 ${grayBg} flex items-center justify-center`}>
-                  <span className="text-xl font-bold text-white">
-                    {display || '0'}
-                  </span>
-                  {hasInput && (display.includes('+') || display.includes('×')) && (
-                    <span className="text-sm text-gray-400 ml-1">={currentTotal}</span>
-                  )}
-                </div>
-                <button 
-                  onClick={() => handleScore()} 
-                  disabled={!hasInput}
-                  className={`${btnBase} ${!hasInput ? grayBg + ' text-gray-600' : ''}`}
-                  style={hasInput ? PURPLE_GRADIENT : {}}
-                >
-                  Got In
-                </button>
-              </>
-            ) : (
-              <>
-                {/* Default Mode: Back | Display | Score */}
-                <button 
-                  onClick={handleBack} 
-                  className={`${btnBase} ${grayBg}`}
-                >
-                  Back
-                </button>
-                <div className={`py-4 ${grayBg} flex items-center justify-center`}>
-                  <span className="text-xl font-bold text-white">
-                    {display || '0'}
-                  </span>
-                  {hasInput && (display.includes('+') || display.includes('×')) && (
-                    <span className="text-sm text-gray-400 ml-1">={currentTotal}</span>
-                  )}
-                </div>
-                <button 
-                  onClick={() => handleScore()} 
-                  disabled={!hasInput}
-                  className={`${btnBase} ${!hasInput ? grayBg + ' text-gray-600' : ''}`}
-                  style={hasInput ? PURPLE_GRADIENT : {}}
-                >
-                  Score
-                </button>
-              </>
-            )}
+            <button 
+              onClick={handleBack} 
+              className={`${btnBase} ${grayBg}`}
+            >
+              Back
+            </button>
+            <div className={`py-4 ${grayBg} flex items-center justify-center`}>
+              <span className="text-xl font-bold text-white">
+                {display || '0'}
+              </span>
+              {hasInput && (display.includes('+') || display.includes('×')) && (
+                <span className="text-sm text-gray-400 ml-1">={currentTotal}</span>
+              )}
+            </div>
+            <button 
+              onClick={() => handleScore()} 
+              disabled={!hasInput}
+              className={`${btnBase} ${!hasInput ? grayBg + ' text-gray-600' : ''}`}
+              style={hasInput ? PURPLE_GRADIENT : {}}
+            >
+              Score
+            </button>
           </div>
           
           {/* Number Pad */}
@@ -198,8 +160,8 @@ export const ScoreInput = ({
             ) : (
               <>
                 <button className={`${btnBase} ${grayBg} border-r border-gray-700 cursor-default`}>🤜</button>
-                {isSolo501 ? (
-                  <button onClick={handleBust} className={`${btnBase} ${grayBg} border-r border-gray-700`}>Bust</button>
+                {showBustButton ? (
+                  <button onClick={handleBust} className={`${btnBase} ${grayBg} border-r border-gray-700`}>{bustLabel}</button>
                 ) : (
                   <button onClick={handleZero} className={`${btnBase} ${grayBg} border-r border-gray-700`}>0</button>
                 )}
