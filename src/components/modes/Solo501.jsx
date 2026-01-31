@@ -40,6 +40,10 @@ export const Solo501 = () => {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [pendingCheckout, setPendingCheckout] = useState(null);
   const [showSavedOverlay, setShowSavedOverlay] = useState(false);
+  
+  // Checkout tracking for unified CO%
+  const [checkoutAttempts, setCheckoutAttempts] = useState(0);
+  const [checkoutSuccesses, setCheckoutSuccesses] = useState(0);
 
   const addSession = useSessionStore(state => state.addSession);
   const sessions = useSessionStore(state => state.sessions);
@@ -66,6 +70,8 @@ export const Solo501 = () => {
         setTurnHistory(data.turnHistory || []);
         setGameStart(data.gameStart ? new Date(data.gameStart) : null);
         setCompletedGames(data.completedGames || []);
+        setCheckoutAttempts(data.checkoutAttempts || 0);
+        setCheckoutSuccesses(data.checkoutSuccesses || 0);
       }
     } catch (e) {
       console.error('Error loading in-progress game:', e);
@@ -79,10 +85,17 @@ export const Solo501 = () => {
         remaining,
         turnHistory,
         gameStart: gameStart?.toISOString(),
-        completedGames
+        completedGames,
+        checkoutAttempts,
+        checkoutSuccesses
       }));
     }
-  }, [remaining, turnHistory, gameStart, completedGames]);
+  }, [remaining, turnHistory, gameStart, completedGames, checkoutAttempts, checkoutSuccesses]);
+
+  // Helper to check if current remaining is a checkout attempt
+  const isCheckoutAttemptScore = (score) => {
+    return score <= 170 && isValidCheckout(score);
+  };
 
   const handleScoreSubmit = (turnScore) => {
     if (!gameStart) setGameStart(new Date());
@@ -102,6 +115,12 @@ export const Solo501 = () => {
     if (!lastTurn.bust) {
       setRemaining(prev => prev + lastTurn.score);
     }
+    
+    // If the undone turn was a checkout attempt, decrement the counter
+    if (lastTurn.wasCheckoutAttempt) {
+      setCheckoutAttempts(prev => Math.max(0, prev - 1));
+    }
+    
     setTurnHistory(prev => prev.slice(1));
     showStatus('↩️ Undone', 800);
   };
@@ -109,11 +128,17 @@ export const Solo501 = () => {
   const processScore = (turnScore) => {
     if (!gameStart) setGameStart(new Date());
     
+    // Track checkout attempt BEFORE processing the score
+    const wasCheckoutAttempt = isCheckoutAttemptScore(remaining);
+    if (wasCheckoutAttempt) {
+      setCheckoutAttempts(prev => prev + 1);
+    }
+    
     const newRemaining = remaining - turnScore;
 
     // Check for bust conditions
     if (newRemaining < 0 || newRemaining === 1 || (newRemaining === 0 && turnScore < 2)) {
-      setTurnHistory(prev => [{ score: 0, remaining: remaining, bust: true, darts: 3 }, ...prev]);
+      setTurnHistory(prev => [{ score: 0, remaining: remaining, bust: true, darts: 3, wasCheckoutAttempt }, ...prev]);
       showStatus('💥 Bust!', 1000);
       trackEvent('Attempt Recorded', { mode: 'solo-501', bust: true });
       return;
@@ -121,14 +146,14 @@ export const Solo501 = () => {
 
     // Check for checkout (game complete)
     if (newRemaining === 0) {
-      setPendingCheckout({ turnScore, remaining });
+      setPendingCheckout({ turnScore, remaining, wasCheckoutAttempt });
       setShowCheckoutModal(true);
       return;
     }
 
     // Valid score, game continues
     setRemaining(newRemaining);
-    setTurnHistory(prev => [{ score: turnScore, remaining: newRemaining, bust: false, darts: 3 }, ...prev]);
+    setTurnHistory(prev => [{ score: turnScore, remaining: newRemaining, bust: false, darts: 3, wasCheckoutAttempt }, ...prev]);
     showStatus('💾 Saved', 800);
     trackEvent('Attempt Recorded', { mode: 'solo-501', score: turnScore });
   };
@@ -161,6 +186,11 @@ export const Solo501 = () => {
       .filter(s => s > 0); // Exclude busts (score: 0)
     turnScores.push(turnScore); // Add the checkout turn
 
+    // Final checkout counts - the checkout attempt was already counted in processScore
+    // Now we count the success
+    const finalCheckoutAttempts = checkoutAttempts;
+    const finalCheckoutSuccesses = checkoutSuccesses + 1;
+
     addSession({
       id: Date.now(),
       mode: 'solo-501',
@@ -170,14 +200,18 @@ export const Solo501 = () => {
       darts: totalDarts,
       turns: totalTurns,
       avg3DA: parseFloat(avg3DA.toFixed(1)),
-      turnScores
+      turnScores,
+      checkoutAttempts: finalCheckoutAttempts,
+      checkoutSuccesses: finalCheckoutSuccesses
     });
 
     trackEvent('Training Session Completed', {
       mode: 'solo-501',
       darts: totalDarts,
       turns: totalTurns,
-      avg3DA: avg3DA.toFixed(1)
+      avg3DA: avg3DA.toFixed(1),
+      checkoutAttempts: finalCheckoutAttempts,
+      checkoutSuccesses: finalCheckoutSuccesses
     });
 
     // Reset for new game
@@ -187,14 +221,22 @@ export const Solo501 = () => {
     setShowCheckoutModal(false);
     setPendingCheckout(null);
     setShowSavedOverlay(true);
+    setCheckoutAttempts(0);
+    setCheckoutSuccesses(0);
   };
 
   const handleHotRowScore = (score, isCheckout) => {
     if (!gameStart) setGameStart(new Date());
     
+    // Track checkout attempt BEFORE processing
+    const wasCheckoutAttempt = isCheckoutAttemptScore(remaining);
+    if (wasCheckoutAttempt) {
+      setCheckoutAttempts(prev => prev + 1);
+    }
+    
     // If this is the checkout button being tapped, go straight to checkout flow
     if (isCheckout) {
-      setPendingCheckout({ turnScore: score, remaining });
+      setPendingCheckout({ turnScore: score, remaining, wasCheckoutAttempt });
       setShowCheckoutModal(true);
       return;
     }
@@ -202,15 +244,15 @@ export const Solo501 = () => {
     const newRemaining = remaining - score;
 
     if (newRemaining < 0 || newRemaining === 1) {
-      setTurnHistory(prev => [{ score: 0, remaining: remaining, bust: true, darts: 3 }, ...prev]);
+      setTurnHistory(prev => [{ score: 0, remaining: remaining, bust: true, darts: 3, wasCheckoutAttempt }, ...prev]);
       showStatus('💥 Bust!', 1000);
       trackEvent('Attempt Recorded', { mode: 'solo-501', bust: true });
     } else if (newRemaining === 0) {
-      setPendingCheckout({ turnScore: score, remaining });
+      setPendingCheckout({ turnScore: score, remaining, wasCheckoutAttempt });
       setShowCheckoutModal(true);
     } else {
       setRemaining(newRemaining);
-      setTurnHistory(prev => [{ score, remaining: newRemaining, bust: false, darts: 3 }, ...prev]);
+      setTurnHistory(prev => [{ score, remaining: newRemaining, bust: false, darts: 3, wasCheckoutAttempt }, ...prev]);
       showStatus('💾 Saved', 800);
       trackEvent('Attempt Recorded', { mode: 'solo-501', score });
     }
@@ -218,7 +260,14 @@ export const Solo501 = () => {
 
   const handleBust = () => {
     if (!gameStart) setGameStart(new Date());
-    setTurnHistory(prev => [{ score: 0, remaining: remaining, bust: true, darts: 3 }, ...prev]);
+    
+    // Track checkout attempt if busting from checkout range
+    const wasCheckoutAttempt = isCheckoutAttemptScore(remaining);
+    if (wasCheckoutAttempt) {
+      setCheckoutAttempts(prev => prev + 1);
+    }
+    
+    setTurnHistory(prev => [{ score: 0, remaining: remaining, bust: true, darts: 3, wasCheckoutAttempt }, ...prev]);
     showStatus('💥 Bust!', 1000);
     trackEvent('Attempt Recorded', { mode: 'solo-501', bust: true });
   };
@@ -228,6 +277,8 @@ export const Solo501 = () => {
     setTurnHistory([]);
     setGameStart(null);
     setShowScoreInput(false);
+    setCheckoutAttempts(0);
+    setCheckoutSuccesses(0);
     
     if (completedGames.length > 0) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ completedGames }));
