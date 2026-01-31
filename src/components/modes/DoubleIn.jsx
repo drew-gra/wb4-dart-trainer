@@ -15,7 +15,6 @@ export const DoubleIn = () => {
   const [attempts, setAttempts] = useState([]);
   const [sessionStart, setSessionStart] = useState(null);
   const [showScoreInput, setShowScoreInput] = useState(false);
-  const [pendingScore, setPendingScore] = useState(null);
   
   const addSession = useSessionStore(state => state.addSession);
   const sessions = useSessionStore(state => state.sessions);
@@ -78,24 +77,14 @@ export const DoubleIn = () => {
   };
 
   const handleHotRowScore = (score) => {
-    // Hot row tap - store pending, user confirms with GOT IN or cancels
-    setPendingScore(score);
+    // Hot row tap = Got In with that score
+    handleGotIn(score);
   };
 
   const handleUndo = () => {
     if (attempts.length === 0) return;
     setAttempts(prev => prev.slice(1));
     showStatus('↩️ Undone', 800);
-  };
-
-  const confirmPendingScore = () => {
-    if (!pendingScore) return;
-    handleGotIn(pendingScore);
-    setPendingScore(null);
-  };
-
-  const cancelPendingScore = () => {
-    setPendingScore(null);
   };
 
   const saveSession = () => {
@@ -130,44 +119,27 @@ export const DoubleIn = () => {
     localStorage.removeItem(STORAGE_KEY);
     setAttempts([]);
     setSessionStart(null);
-    setPendingScore(null);
     showStatus('📊 Session saved', 1500);
   };
 
   return (
     <>
-      {/* Header */}
+      {/* Header - shows last outcome */}
       <div className="text-center mb-8">
-        <div className="text-4xl font-black mb-2" style={GOLD_GRADIENT}>
-          GET IN
-        </div>
-        <p className="text-gray-400 text-sm">
-          Three darts to hit any double.
-        </p>
-      </div>
-
-      {/* Pending Score from Hot Row */}
-      {pendingScore && (
-        <div className="bg-gray-900 rounded-lg p-4 mb-4 border border-yellow-500 text-center">
-          <div className="text-sm text-gray-400 mb-2">Score ready:</div>
-          <div className="text-3xl font-black text-yellow-400 mb-3">{pendingScore}</div>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={confirmPendingScore}
-              className="py-3 rounded-lg font-bold text-white"
-              style={{ background: 'linear-gradient(145deg, #7c3aed, #5b21b6)' }}
-            >
-              ✅ GOT IN
-            </button>
-            <button
-              onClick={cancelPendingScore}
-              className="py-3 rounded-lg font-bold bg-gray-700 text-gray-300"
-            >
-              ❌ CANCEL
-            </button>
+        {attempts.length === 0 ? (
+          <div className="text-4xl font-black" style={GOLD_GRADIENT}>
+            GET IN
           </div>
-        </div>
-      )}
+        ) : attempts[0].outcome === 'success' ? (
+          <div className="text-4xl font-black" style={GOLD_GRADIENT}>
+            GOT IN
+          </div>
+        ) : (
+          <div className="text-4xl font-black" style={GOLD_GRADIENT}>
+            MISSED
+          </div>
+        )}
+      </div>
 
       {/* Score Input + Hot Row */}
       <div className="mb-6">
