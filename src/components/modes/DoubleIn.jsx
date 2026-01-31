@@ -50,14 +50,37 @@ export const DoubleIn = () => {
 
   const stats = calculateStats(attempts);
 
-  const handleScoreFromInput = (score) => {
-    // Score entered via ScoreInput - store it pending GOT IN button
-    setPendingScore(score);
-    setShowScoreInput(false);
+  const handleGotIn = (score) => {
+    // Score submitted via ScoreInput "Got In" button
+    if (score < 2 || score > 170) {
+      showStatus('⚠️ Score must be 2-170', 2000);
+      return;
+    }
+
+    const now = new Date();
+    if (attempts.length === 0) setSessionStart(now);
+
+    const attempt = { outcome: 'success', score, timestamp: now.toLocaleTimeString() };
+    setAttempts(prev => [attempt, ...prev]);
+    trackEvent('Attempt Recorded', { mode: 'double-in', outcome: 'success', score });
+    showStatus('💾 Saved', 800);
+    setPendingScore(null);
+  };
+
+  const handleBust = () => {
+    // Bust pressed in ScoreInput
+    const now = new Date();
+    if (attempts.length === 0) setSessionStart(now);
+
+    const attempt = { outcome: 'fail', score: null, timestamp: now.toLocaleTimeString() };
+    setAttempts(prev => [attempt, ...prev]);
+    trackEvent('Attempt Recorded', { mode: 'double-in', outcome: 'fail' });
+    showStatus('💾 Saved', 800);
+    setPendingScore(null);
   };
 
   const handleHotRowScore = (score) => {
-    // Hot row tap - store pending
+    // Hot row tap - store pending, user still needs to confirm
     setPendingScore(score);
   };
 
@@ -67,33 +90,14 @@ export const DoubleIn = () => {
     showStatus('↩️ Undone', 800);
   };
 
-  const recordAttempt = (outcome) => {
-    const now = new Date();
-    const start = attempts.length === 0 ? now : sessionStart;
-    if (attempts.length === 0) setSessionStart(now);
+  const confirmPendingScore = () => {
+    if (!pendingScore) return;
+    handleGotIn(pendingScore);
+  };
 
-    let score = null;
-    if (outcome === 'success' && pendingScore) {
-      const val = pendingScore;
-      if (val >= 2 && val <= 170) {
-        score = val;
-        setPendingScore(null);
-        trackEvent('Score Entered', { score: val, mode: 'double-in' });
-      } else {
-        showStatus('⚠️ Score must be 2-170', 2000);
-        return;
-      }
-    }
-
-    const attempt = { outcome, score, timestamp: now.toLocaleTimeString() };
-    setAttempts(prev => [attempt, ...prev]);
-    trackEvent('Attempt Recorded', { mode: 'double-in', outcome });
-    showStatus('💾 Saved', 1000);
-    
-    // Clear pending score on miss too
-    if (outcome === 'fail') {
-      setPendingScore(null);
-    }
+  const cancelPendingScore = () => {
+    setPendingScore(null);
+    showStatus('❌ Cancelled', 800);
   };
 
   const saveSession = () => {
@@ -134,29 +138,46 @@ export const DoubleIn = () => {
 
   return (
     <>
-      {/* Score Input Section */}
+      {/* Header */}
       <div className="text-center mb-8">
-        <div className="text-4xl font-black mb-4" style={GOLD_GRADIENT}>
+        <div className="text-4xl font-black mb-2" style={GOLD_GRADIENT}>
           GET IN
         </div>
-        <p className="text-gray-400 text-sm mb-4">
-          You have three darts to get in. Hit any double and enter your score.
+        <p className="text-gray-400 text-sm">
+          Three darts to hit any double.
         </p>
-        
-        {/* Pending Score Display */}
-        {pendingScore && (
-          <div className="text-2xl font-bold text-yellow-400 mb-4">
-            Score ready: {pendingScore}
-          </div>
-        )}
       </div>
+
+      {/* Pending Score from Hot Row */}
+      {pendingScore && (
+        <div className="bg-gray-900 rounded-lg p-4 mb-4 border border-yellow-500 text-center">
+          <div className="text-sm text-gray-400 mb-2">Score ready:</div>
+          <div className="text-3xl font-black text-yellow-400 mb-3">{pendingScore}</div>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={confirmPendingScore}
+              className="py-3 rounded-lg font-bold text-white"
+              style={{ background: 'linear-gradient(145deg, #7c3aed, #5b21b6)' }}
+            >
+              ✅ GOT IN
+            </button>
+            <button
+              onClick={cancelPendingScore}
+              className="py-3 rounded-lg font-bold bg-gray-700 text-gray-300"
+            >
+              ❌ CANCEL
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Score Input + Hot Row */}
       <div className="mb-6">
         <ScoreInput
           isOpen={showScoreInput}
           onToggle={() => setShowScoreInput(!showScoreInput)}
-          onScore={handleScoreFromInput}
+          onScore={handleGotIn}
+          onBust={handleBust}
           onBack={handleUndo}
           canUndo={attempts.length > 0}
           mode="double-in"
@@ -172,23 +193,14 @@ export const DoubleIn = () => {
         />
       </div>
 
-      {/* Action Buttons */}
-      <div className="grid grid-cols-3 gap-3 mb-8">
-        <ActionButton 
-          icon="✅" 
-          label="GOT IN!" 
-          onClick={() => recordAttempt('success')} 
-        />
-        <ActionButton 
-          icon="❌" 
-          label="MISSED" 
-          onClick={() => recordAttempt('fail')} 
-        />
+      {/* Save Button */}
+      <div className="mb-8">
         <ActionButton 
           icon="💾" 
-          label="SAVE" 
+          label="SAVE SESSION" 
           onClick={saveSession}
           disabled={attempts.length === 0}
+          className="w-full"
         />
       </div>
 
@@ -198,17 +210,17 @@ export const DoubleIn = () => {
       </StatsCard>
 
       <RecentList 
-        title="🔁 RECENT INS"
+        title="🔁 RECENT"
         items={attempts}
         renderItem={(a, i) => (
           <>
-            <span className="text-yellow-400 font-semibold">
-              {a.outcome === 'success' && a.score ? `Score: ${a.score}` : 'DOUBLE IN'}
-            </span>
             <span className={`font-semibold ${a.outcome === 'success' ? 'text-green-400' : 'text-red-400'}`}>
               {a.outcome === 'success' ? '✅ GOT IN' : '❌ MISSED'}
             </span>
-            <span className="text-gray-400 text-xs">{a.timestamp}</span>
+            {a.outcome === 'success' && a.score && (
+              <span className="text-yellow-400 font-semibold">{a.score}</span>
+            )}
+            <span className="text-gray-500 text-xs">{a.timestamp}</span>
           </>
         )}
       />
