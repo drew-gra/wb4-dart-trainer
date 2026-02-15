@@ -77,7 +77,6 @@ const calculateUnifiedMetrics = (sessions) => {
   const tripsRounds = tripsSessions.reduce((sum, s) => sum + s.totalAttempts, 0);
 
   const cricketSessions = sessions.filter(s => s.mode === 'cricket');
-  // Use totalMarks if available (new data), otherwise fall back to 21 (old data)
   const cricketMarks = cricketSessions.reduce((sum, s) => sum + (s.totalMarks || 21), 0);
   const cricketRounds = cricketSessions.reduce((sum, s) => sum + (s.throws / 3), 0);
 
@@ -108,16 +107,47 @@ const calculateSessionCounts = (sessions) => {
   return counts;
 };
 
+// Render a session row
+const SessionRow = ({ s }) => {
+  const endDateTime = new Date(s.endTime);
+  const dateStr = endDateTime.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  const timeStr = endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  
+  let statStr = '';
+  if (s.mode === 'cricket') statStr = `${s.mpr || (63 / s.throws).toFixed(2)} MPR`;
+  else if (s.mode === 'solo-501') statStr = `${s.avg3DA} 3DA`;
+  else if (s.mode === 'triples') statStr = `${s.avgRounds} MPR`;
+  else if (s.mode === 'first-9') statStr = `${s.avg3DA} 3DA`;
+  else statStr = `${s.successRate}%`;
+  
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-gray-800">
+      <div className="flex items-center gap-3">
+        <div className={`w-2 h-2 rounded-full ${modeColors[s.mode]}`}></div>
+        <span className="text-gray-300 text-sm">{modeLabels[s.mode]}</span>
+        <span className="text-gray-600 text-xs">{dateStr} {timeStr}</span>
+      </div>
+      <div className="text-yellow-400 text-sm font-bold">
+        {statStr}
+      </div>
+    </div>
+  );
+};
+
 export const History = ({ onBack }) => {
   const [confirmClear, setConfirmClear] = useState(false);
-  const sessions = useSessionStore(state => state.sessions);
+  const repsSessions = useSessionStore(state => state.repsSessions);
+  const soloSessions = useSessionStore(state => state.soloSessions);
   const clearSessions = useSessionStore(state => state.clearSessions);
   const showStatus = useAppStore(state => state.showStatus);
 
-  // Memoized calculations
-  const metrics = useMemo(() => calculateUnifiedMetrics(sessions), [sessions]);
-  const totalDarts = useMemo(() => calculateTotalDarts(sessions), [sessions]);
-  const sessionCounts = useMemo(() => calculateSessionCounts(sessions), [sessions]);
+  // Combined sessions for unified metrics
+  const allSessions = useMemo(() => [...repsSessions, ...soloSessions], [repsSessions, soloSessions]);
+
+  // Memoized calculations (from combined data)
+  const metrics = useMemo(() => calculateUnifiedMetrics(allSessions), [allSessions]);
+  const totalDarts = useMemo(() => calculateTotalDarts(allSessions), [allSessions]);
+  const sessionCounts = useMemo(() => calculateSessionCounts(allSessions), [allSessions]);
 
   const handleClearAll = () => {
     clearSessions();
@@ -204,39 +234,28 @@ export const History = ({ onBack }) => {
         </div>
       </div>
 
-      {/* Session History */}
-      {sessions.length > 0 ? (
+      {/* Reps Session History */}
+      {repsSessions.length > 0 && (
         <div className="mb-6">
-          <h3 className="text-lg font-bold mb-3 text-pink-400">📈 RECENT SESSIONS</h3>
-          <div className="space-y-1 max-h-80 overflow-y-auto">
-            {sessions.map((s) => {
-              const endDateTime = new Date(s.endTime);
-              const dateStr = endDateTime.toLocaleDateString([], { month: 'short', day: 'numeric' });
-              const timeStr = endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-              
-              let statStr = '';
-              if (s.mode === 'cricket') statStr = `${s.mpr || (63 / s.throws).toFixed(2)} MPR`;
-              else if (s.mode === 'solo-501') statStr = `${s.avg3DA} 3DA`;
-              else if (s.mode === 'triples') statStr = `${s.avgRounds} MPR`;
-              else if (s.mode === 'first-9') statStr = `${s.avg3DA} 3DA`;
-              else statStr = `${s.successRate}%`;
-              
-              return (
-                <div key={s.id} className="flex items-center justify-between py-2 border-b border-gray-800">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${modeColors[s.mode]}`}></div>
-                    <span className="text-gray-300 text-sm">{modeLabels[s.mode]}</span>
-                    <span className="text-gray-600 text-xs">{dateStr} {timeStr}</span>
-                  </div>
-                  <div className="text-yellow-400 text-sm font-bold">
-                    {statStr}
-                  </div>
-                </div>
-              );
-            })}
+          <h3 className="text-lg font-bold mb-3 text-pink-400">🔁 REPS SESSIONS</h3>
+          <div className="space-y-1 max-h-60 overflow-y-auto">
+            {repsSessions.map((s) => <SessionRow key={s.id} s={s} />)}
           </div>
         </div>
-      ) : (
+      )}
+
+      {/* Solo Session History */}
+      {soloSessions.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-lg font-bold mb-3 text-pink-400">🎮 SOLO SESSIONS</h3>
+          <div className="space-y-1 max-h-60 overflow-y-auto">
+            {soloSessions.map((s) => <SessionRow key={s.id} s={s} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Empty state (only if both are empty) */}
+      {repsSessions.length === 0 && soloSessions.length === 0 && (
         <div className="bg-gray-900 rounded-lg p-8 text-center mb-6 border border-gray-800">
           <p className="text-gray-400 text-sm">
             No sessions yet. Complete a training session to see it here!
