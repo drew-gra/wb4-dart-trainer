@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useSessionStore } from '../../store/gameStore';
 import { calculateDataSufficiency, calculateRegionalAnalysis } from '../../utils/heatmap';
-import { BOARD_REGIONS, GOLD_GRADIENT } from '../../utils/constants';
+import { GOLD_GRADIENT } from '../../utils/constants';
 
 // Home icon SVG component
 const HomeIcon = ({ size = 20 }) => (
@@ -111,7 +111,7 @@ const calculateTrending = (sessions) => {
     };
   }
 
-  return { trend3DA, trendMPR };
+  return { trend3DA, trendMPR, count3DA: all3DA.length, countMPR: allMPR.length };
 };
 
 export const Insights = ({ onBack }) => {
@@ -226,54 +226,27 @@ export const Insights = ({ onBack }) => {
         ) : (
           <div className="py-6 text-center">
             <p className="text-gray-500 text-sm">Insufficient Data</p>
+            <p className="text-gray-600 text-xs mt-1">
+              {trending.count3DA} of 50 (3DA) · {trending.countMPR} of 50 (MPR)
+            </p>
           </div>
         )}
       </div>
 
-      {/* YOUR PRACTICE FOCUS */}
+      {/* PRACTICE FOCUS */}
       {!dataSufficiency.hasMinimum ? (
-        <div className="bg-gray-900 rounded-lg p-6 mb-6 border border-gray-800">
-          <h3 className="text-base font-bold mb-4 text-pink-400">
-            YOUR PRACTICE FOCUS
-          </h3>
-
-          <p className="text-sm text-gray-300 mb-6">
-            Good news: You need to throw more darts!<br/><br/>
-            I need more data to provide real advice. Once these thresholds are met,
-            I can tell you what the data says you should work on.
-          </p>
-
-          <div className="mb-6">
-            <div className="flex justify-between mb-2">
-              <span className="text-sm text-gray-300">Total Darts</span>
-              <span className="text-sm font-bold text-white">
-                {dataSufficiency.totalAttempts} / 360
-              </span>
-            </div>
-            <div className="w-full bg-gray-700 rounded-full h-4">
-              <div
-                className={`h-4 rounded-full transition-all ${
-                  dataSufficiency.totalAttempts >= 360 ? 'bg-purple-600' : 'bg-yellow-500'
-                }`}
-                style={{ width: `${Math.min(100, (dataSufficiency.totalAttempts / 360) * 100)}%` }}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            {Object.entries(dataSufficiency.regionData).map(([key, darts]) => (
-              <div key={key} className="text-sm">
-                <span className="text-gray-300 capitalize">{BOARD_REGIONS[key].name}: </span>
-                <span className={`font-bold ${darts >= 90 ? 'text-green-400' : 'text-purple-400'}`}>
-                  {darts >= 90 ? 'Sufficient data' : 'Not sufficient data'}
-                </span>
-              </div>
-            ))}
+        <div className="bg-gray-900 rounded-lg p-5 border border-gray-800">
+          <h3 className="text-lg font-bold mb-4 text-pink-400">PRACTICE FOCUS</h3>
+          <div className="py-6 text-center">
+            <p className="text-gray-500 text-sm">Insufficient Data</p>
+            <p className="text-gray-600 text-xs mt-1">
+              {dataSufficiency.totalAttempts} of 360 instances
+            </p>
           </div>
         </div>
       ) : (
         <div className="bg-gray-900 rounded-lg p-5 border border-gray-800">
-          <h3 className="text-lg font-bold mb-3 text-pink-400">YOUR PRACTICE FOCUS</h3>
+          <h3 className="text-lg font-bold mb-3 text-pink-400">PRACTICE FOCUS</h3>
           <p className="text-sm text-gray-300 mb-4">
             The data says you need to work on {getRegionDescription(weakest[1].name)}.
             Your efficiency there is {((meanScore - weakest[1].score) / meanScore * 100).toFixed(0)}%
