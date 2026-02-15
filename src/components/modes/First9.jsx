@@ -249,11 +249,12 @@ export const First9 = () => {
         <button
           onClick={handleSaveSession}
           disabled={completedInstances.length === 0}
-          className={`w-full py-4 rounded-lg font-bold transition-all border-2 ${
+          className={`w-full py-4 rounded-lg font-black text-lg transition-all border-2 shadow-lg ${
             completedInstances.length === 0
               ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
-              : 'bg-gray-700 text-white border-gray-600 hover:bg-gray-600'
+              : 'text-black border-yellow-400 transform hover:scale-105'
           }`}
+          style={completedInstances.length > 0 ? { background: 'linear-gradient(45deg, #ffd700, #ffed4a)' } : {}}
         >
           💾 SAVE SESSION
         </button>

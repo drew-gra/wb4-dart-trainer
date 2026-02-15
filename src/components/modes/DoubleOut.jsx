@@ -122,7 +122,7 @@ export const DoubleOut = () => {
         <p className="text-gray-400 text-sm">This is your out. You have three darts.</p>
       </div>
 
-      <div className="grid grid-cols-4 gap-2 mb-8">
+      <div className="grid grid-cols-3 gap-2 mb-4">
         <ActionButton 
           icon="✅" 
           label="HIT IT!" 
@@ -141,12 +141,22 @@ export const DoubleOut = () => {
           onClick={skipTarget}
           disabled={!currentTarget}
         />
-        <ActionButton 
-          icon="💾" 
-          label="SAVE" 
+      </div>
+
+      {/* Save Button */}
+      <div className="mb-8">
+        <button
           onClick={saveSession}
           disabled={attempts.length === 0}
-        />
+          className={`w-full py-4 rounded-lg font-black text-lg transition-all border-2 shadow-lg ${
+            attempts.length === 0
+              ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+              : 'text-black border-yellow-400 transform hover:scale-105'
+          }`}
+          style={attempts.length > 0 ? { background: 'linear-gradient(45deg, #ffd700, #ffed4a)' } : {}}
+        >
+          💾 SAVE SESSION
+        </button>
       </div>
 
       <StatsCard title="📊 STATS">

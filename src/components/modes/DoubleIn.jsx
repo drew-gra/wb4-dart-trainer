@@ -3,7 +3,6 @@ import { useSessionStore, useAppStore } from '../../store/gameStore';
 import { calculateStats } from '../../utils/statistics';
 import { trackEvent } from '../../utils/analytics';
 import { getHotRowScores } from '../../utils/hotrow';
-import { ActionButton } from '../ui/Button';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
 import { ScoreInput } from '../ui/ScoreInput';
 import { HotRow } from '../ui/HotRow';
@@ -169,13 +168,18 @@ export const DoubleIn = () => {
 
       {/* Save Button */}
       <div className="mb-8">
-        <ActionButton 
-          icon="💾" 
-          label="SAVE SESSION" 
+        <button
           onClick={saveSession}
           disabled={attempts.length === 0}
-          className="w-full"
-        />
+          className={`w-full py-4 rounded-lg font-black text-lg transition-all border-2 shadow-lg ${
+            attempts.length === 0
+              ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+              : 'text-black border-yellow-400 transform hover:scale-105'
+          }`}
+          style={attempts.length > 0 ? { background: 'linear-gradient(45deg, #ffd700, #ffed4a)' } : {}}
+        >
+          💾 SAVE SESSION
+        </button>
       </div>
 
       <StatsCard title="📊 STATS">

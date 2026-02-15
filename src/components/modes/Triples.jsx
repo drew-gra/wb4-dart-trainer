@@ -139,14 +139,21 @@ export const Triples = () => {
         </>
       )}
 
-      <Button 
-        onClick={saveSession} 
-        disabled={attempts.length === 0}
-        className="w-full flex items-center justify-center mb-8"
-      >
-        <span className="text-lg mr-2">💾</span>
-        <span className="text-xs font-bold">SAVE SESSION</span>
-      </Button>
+      {/* Save Button */}
+      <div className="mb-8">
+        <button
+          onClick={saveSession}
+          disabled={attempts.length === 0}
+          className={`w-full py-4 rounded-lg font-black text-lg transition-all border-2 shadow-lg ${
+            attempts.length === 0
+              ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+              : 'text-black border-yellow-400 transform hover:scale-105'
+          }`}
+          style={attempts.length > 0 ? { background: 'linear-gradient(45deg, #ffd700, #ffed4a)' } : {}}
+        >
+          💾 SAVE SESSION
+        </button>
+      </div>
 
       <StatsCard title="📊 STATS">
         <StatItem value={stats.total} label="ATTEMPTS" color="yellow" />
