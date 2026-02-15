@@ -45,11 +45,11 @@ const MainMenu = ({ onModeChange }) => {
         {/* About Section */}
         <div>
           <div className="flex justify-center">
-            <button 
+            <button
               onClick={() => setAboutOpen(!aboutOpen)}
-              className="py-3 px-6 text-yellow-400"
+              className="py-3 px-6 text-yellow-400 flex flex-col items-center"
             >
-              <span className="text-sm font-bold mr-2">ABOUT</span>
+              <span className="text-sm font-bold">ABOUT</span>
               <span className="text-3xl">{aboutOpen ? '↑' : '↓'}</span>
             </button>
           </div>
@@ -58,17 +58,20 @@ const MainMenu = ({ onModeChange }) => {
             <div className="bg-gray-900 rounded-lg border border-gray-800 p-5">
               <div className="text-sm text-gray-300 leading-relaxed space-y-4">
                 <p>
-                  This is a free darts practice app for solo play. It saves and provides analytics on your last 200 solo practice sessions across six practice modes:
+                  This is a free darts practice app for solo play. It saves and provides analytics on your last 200 solo practice sessions across six modes:
                 </p>
-                <p className="text-yellow-400 font-semibold">
-                  Reps: double-in (DI) | double-out (DO) | triples (trips) | 501 first nine (F9)<br />
-                  Solo play: cricket | 501 straight-in
-                </p>
+                <div className="text-yellow-400 font-semibold text-center space-y-2">
+                  <p>Reps: double-in (DI) | double-out (DO) | triples (trips) | 501 first nine (F9)</p>
+                  <p>Solo play: cricket | 501 straight-in</p>
+                </div>
                 <p>
                   No account is needed to use the app and all data is exportable. But if you switch devices or clear the browser memory, it will reset your session history.
                 </p>
-                <p className="text-yellow-400 text-xs font-semibold">
+                <p>
                   Created at The Westbury Inn of the Park Slope Darts League.
+                </p>
+                <p>
+                  business enquiries: wb4(at)breadandlaw(dot)com
                 </p>
               </div>
             </div>
@@ -91,13 +94,6 @@ const MainMenu = ({ onModeChange }) => {
           >
             💡 INSIGHTS
           </button>
-        </div>
-
-        {/* Browser Storage Info */}
-        <div className="pt-2">
-          <p className="text-sm text-gray-300 text-center">
-            Your practice history is saved to this device automatically. No account needed.
-          </p>
         </div>
       </div>
     </>
