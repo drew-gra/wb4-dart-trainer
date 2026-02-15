@@ -5,7 +5,9 @@ import { BOARD_REGIONS } from '../../utils/constants';
 import { Button } from '../ui/Button';
 
 export const Insights = ({ onBack }) => {
-  const sessions = useSessionStore(state => state.sessions);
+  const repsSessions = useSessionStore(state => state.repsSessions);
+  const soloSessions = useSessionStore(state => state.soloSessions);
+  const sessions = [...repsSessions, ...soloSessions];
   
   const dataSufficiency = calculateDataSufficiency(sessions);
   const regionalAnalysis = calculateRegionalAnalysis(sessions);
