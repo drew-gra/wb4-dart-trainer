@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useSessionStore, useAppStore } from '../../store/gameStore';
-import { Button } from '../ui/Button';
 import { GOLD_GRADIENT } from '../../utils/constants';
 
 // Static lookup tables (defined outside component to avoid recreation)
@@ -21,6 +20,23 @@ const modeLabels = {
   'solo-501': 'SOLO 501',
   'cricket': 'CRICKET'
 };
+
+// Home icon SVG component
+const HomeIcon = ({ size = 20 }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+  >
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    <polyline points="9 22 9 12 15 12 15 22" />
+  </svg>
+);
 
 // Gear icon SVG component
 const GearIcon = ({ size = 20 }) => (
@@ -191,8 +207,15 @@ export const History = ({ onBack }) => {
     <>
       {/* History Header with Gear */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-pink-400">📊 HISTORY</h2>
-        <div className="relative" ref={settingsRef}>
+        <h2 className="text-xl font-bold text-pink-400">HISTORY</h2>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onBack}
+            className="p-2 rounded-lg transition-all text-gray-500 hover:text-gray-300"
+          >
+            <HomeIcon size={22} />
+          </button>
+          <div className="relative" ref={settingsRef}>
           <button
             onClick={() => {
               setSettingsOpen(!settingsOpen);
@@ -215,7 +238,7 @@ export const History = ({ onBack }) => {
                   onClick={() => setConfirmStep(true)}
                   className="w-full text-left px-4 py-3 text-red-400 text-sm font-semibold hover:bg-gray-800 rounded-lg transition-colors"
                 >
-                  🧹 Clear all data
+                  Clear all data
                 </button>
               ) : (
                 <div className="p-4">
@@ -238,6 +261,7 @@ export const History = ({ onBack }) => {
               )}
             </div>
           )}
+        </div>
         </div>
       </div>
 
@@ -289,7 +313,7 @@ export const History = ({ onBack }) => {
 
       {/* Universal Metrics */}
       <div className="bg-gray-900 rounded-lg p-4 mb-6 border-2 border-yellow-500">
-        <h3 className="text-lg font-bold mb-4 text-pink-400">🎯 YOUR METRICS</h3>
+        <h3 className="text-lg font-bold mb-4 text-pink-400">YOUR METRICS</h3>
         <div className="grid grid-cols-4 gap-2 text-center">
           <div>
             <div className="text-xs text-gray-300 font-medium mb-1">DI %</div>
@@ -321,7 +345,7 @@ export const History = ({ onBack }) => {
       {/* Reps Session History */}
       {repsSessions.length > 0 && (
         <div className="mb-6">
-          <h3 className="text-lg font-bold mb-3 text-pink-400">🔁 REPS SESSIONS</h3>
+          <h3 className="text-lg font-bold mb-3 text-pink-400">REPS SESSIONS</h3>
           <div className="space-y-1 max-h-60 overflow-y-auto">
             {repsSessions.map((s) => <SessionRow key={s.id} s={s} />)}
           </div>
@@ -331,7 +355,7 @@ export const History = ({ onBack }) => {
       {/* Solo Session History */}
       {soloSessions.length > 0 && (
         <div className="mb-6">
-          <h3 className="text-lg font-bold mb-3 text-pink-400">🎮 SOLO SESSIONS</h3>
+          <h3 className="text-lg font-bold mb-3 text-pink-400">SOLO SESSIONS</h3>
           <div className="space-y-1 max-h-60 overflow-y-auto">
             {soloSessions.map((s) => <SessionRow key={s.id} s={s} />)}
           </div>
@@ -347,15 +371,6 @@ export const History = ({ onBack }) => {
         </div>
       )}
 
-      {/* Back Button */}
-      <Button 
-        onClick={onBack}
-        className="w-full mb-8"
-        size="lg"
-        style={{ background: 'linear-gradient(145deg, #7c3aed, #5b21b6)' }}
-      >
-        ← BACK TO MENU
-      </Button>
     </>
   );
 };
