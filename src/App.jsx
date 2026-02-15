@@ -142,8 +142,6 @@ const App = () => {
           <div className="text-4xl" style={{ letterSpacing: '0.5em' }}>🤜👈</div>
         </div>
         <div className="text-center text-yellow-400 text-xs font-semibold leading-tight">
-          <p>Developed at The Westbury Inn of the Park Slope Darts League.</p>
-          <p>Flatbush vs. Everybody.</p>
           <p>All rights reserved.</p>
         </div>
       </div>
