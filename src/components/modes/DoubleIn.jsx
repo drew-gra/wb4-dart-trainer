@@ -17,11 +17,15 @@ export const DoubleIn = () => {
   const [showScoreInput, setShowScoreInput] = useState(false);
   
   const addSession = useSessionStore(state => state.addSession);
-  const sessions = useSessionStore(state => state.sessions);
+  const repsSessions = useSessionStore(state => state.repsSessions);
+  const soloSessions = useSessionStore(state => state.soloSessions);
   const showStatus = useAppStore(state => state.showStatus);
 
+  // Merge buckets for hot row calculation
+  const allSessions = useMemo(() => [...repsSessions, ...soloSessions], [repsSessions, soloSessions]);
+
   // Compute dynamic hot row scores from session history
-  const hotRowScores = useMemo(() => getHotRowScores(sessions), [sessions]);
+  const hotRowScores = useMemo(() => getHotRowScores(allSessions), [allSessions]);
 
   // Load in-progress session on mount
   useEffect(() => {
@@ -180,7 +184,7 @@ export const DoubleIn = () => {
       </StatsCard>
 
       <RecentList 
-        title="🔁 RECENT"
+        title="🔍 RECENT"
         items={attempts}
         renderItem={(a, i) => (
           <>

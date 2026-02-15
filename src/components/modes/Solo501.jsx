@@ -46,19 +46,23 @@ export const Solo501 = () => {
   const [checkoutSuccesses, setCheckoutSuccesses] = useState(0);
 
   const addSession = useSessionStore(state => state.addSession);
-  const sessions = useSessionStore(state => state.sessions);
+  const repsSessions = useSessionStore(state => state.repsSessions);
+  const soloSessions = useSessionStore(state => state.soloSessions);
   const showStatus = useAppStore(state => state.showStatus);
 
+  // Merge buckets for hot row calculation
+  const allSessions = useMemo(() => [...repsSessions, ...soloSessions], [repsSessions, soloSessions]);
+
   // Compute dynamic hot row scores from session history
-  const hotRowScores = useMemo(() => getHotRowScores(sessions), [sessions]);
+  const hotRowScores = useMemo(() => getHotRowScores(allSessions), [allSessions]);
 
   // Calculate consolidated 3DA from all saved solo-501 sessions
   const consolidated3DA = useMemo(() => {
-    const solo501Sessions = sessions.filter(s => s.mode === 'solo-501' && s.avg3DA);
+    const solo501Sessions = soloSessions.filter(s => s.mode === 'solo-501' && s.avg3DA);
     if (solo501Sessions.length === 0) return null;
     const avg = solo501Sessions.reduce((sum, s) => sum + s.avg3DA, 0) / solo501Sessions.length;
     return avg.toFixed(1);
-  }, [sessions]);
+  }, [soloSessions]);
 
   // Load in-progress game on mount
   useEffect(() => {
@@ -393,7 +397,7 @@ export const Solo501 = () => {
       {/* Recent Turns */}
       {turnHistory.length > 0 && (
         <RecentList
-          title="🔁 RECENT TURNS"
+          title="🔍 RECENT TURNS"
           items={turnHistory.slice(0, 10)}
           renderItem={(turn, i) => (
             <>

@@ -27,11 +27,15 @@ export const First9 = () => {
   const [showSavedOverlay, setShowSavedOverlay] = useState(false);
 
   const addSession = useSessionStore(state => state.addSession);
-  const sessions = useSessionStore(state => state.sessions);
+  const repsSessions = useSessionStore(state => state.repsSessions);
+  const soloSessions = useSessionStore(state => state.soloSessions);
   const showStatus = useAppStore(state => state.showStatus);
 
+  // Merge buckets for hot row calculation
+  const allSessions = useMemo(() => [...repsSessions, ...soloSessions], [repsSessions, soloSessions]);
+
   // Compute dynamic hot row scores from session history
-  const hotRowScores = useMemo(() => getHotRowScores(sessions), [sessions]);
+  const hotRowScores = useMemo(() => getHotRowScores(allSessions), [allSessions]);
 
   // Load in-progress session on mount
   useEffect(() => {
@@ -262,7 +266,7 @@ export const First9 = () => {
       </StatsCard>
 
       <RecentList 
-        title="🔁 RECENT F9s"
+        title="🔍 RECENT F9s"
         items={[...completedInstances].reverse().map((avg, i) => ({ avg, index: completedInstances.length - i }))}
         renderItem={(item, i) => (
           <>
