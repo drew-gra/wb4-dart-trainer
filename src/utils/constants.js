@@ -27,7 +27,6 @@ export const BOARD_REGIONS = {
 export const MENU_CATEGORIES = [
   { id: 'reps', label: 'REPS', description: 'Repetition drills with assigned targets', defaultMode: 'double-in' },
   { id: 'solo', label: 'SOLO', description: 'Full game simulations', defaultMode: 'cricket' },
-  { id: 'multiplayer', label: 'MULTIPLAYER', description: 'Coming soon', disabled: true, comingSoon: true },
 ];
 
 // Reps modes (repetition-based drills)
