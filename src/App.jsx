@@ -10,10 +10,12 @@ const App = () => {
   const setMode = useAppStore(state => state.setMode);
   const saveStatus = useAppStore(state => state.saveStatus);
   const loadSessions = useSessionStore(state => state.loadSessions);
+  const loadPlayerInfo = useAppStore(state => state.loadPlayerInfo);
 
-  // Load sessions on mount
+  // Load sessions + player info on mount
   useEffect(() => {
     loadSessions();
+    loadPlayerInfo();
   }, []);
 
   const handleModeChange = (mode) => {

@@ -3,6 +3,9 @@ import { create } from 'zustand';
 const LEGACY_KEY = 'wb4UnifiedSessionHistory';
 const REPS_KEY = 'wb4RepsSessions';
 const SOLO_KEY = 'wb4SoloSessions';
+const PLAYER_NAME_KEY = 'wb4_player_name';
+const PLAYER_TEAM_KEY = 'wb4_player_team';
+const NAME_DECLINED_KEY = 'wb4_name_declined';
 const MAX_PER_BUCKET = 100;
 
 // Mode classification
@@ -105,16 +108,60 @@ export const useSessionStore = create((set, get) => ({
 }));
 
 /**
- * Store for current app state (mode, UI state)
+ * Store for current app state (mode, UI state, player identity)
+ * 
+ * Player name/team persist independently from session data.
+ * Clearing sessions does NOT clear player identity.
  */
 export const useAppStore = create((set) => ({
   currentMode: null,
   saveStatus: '',
+  playerName: null,
+  playerTeam: null,
+  nameDeclined: false,
   
   setMode: (mode) => set({ currentMode: mode }),
   
   showStatus: (message, timeout = 2000) => {
     set({ saveStatus: message });
     setTimeout(() => set({ saveStatus: '' }), timeout);
-  }
+  },
+
+  // Load player identity from localStorage
+  loadPlayerInfo: () => {
+    try {
+      const name = localStorage.getItem(PLAYER_NAME_KEY);
+      const team = localStorage.getItem(PLAYER_TEAM_KEY);
+      const declined = localStorage.getItem(NAME_DECLINED_KEY);
+      set({
+        playerName: name || null,
+        playerTeam: team || null,
+        nameDeclined: declined === 'true',
+      });
+    } catch (e) {
+      console.error('Error loading player info:', e);
+    }
+  },
+
+  // Set player name + team
+  setPlayerInfo: (name, team) => {
+    if (name) localStorage.setItem(PLAYER_NAME_KEY, name);
+    if (team) localStorage.setItem(PLAYER_TEAM_KEY, team);
+    localStorage.removeItem(NAME_DECLINED_KEY);
+    set({ playerName: name || null, playerTeam: team || null, nameDeclined: false });
+  },
+
+  // User declined to enter name
+  declineName: () => {
+    localStorage.setItem(NAME_DECLINED_KEY, 'true');
+    set({ nameDeclined: true });
+  },
+
+  // Clear player identity (from settings)
+  clearPlayerInfo: () => {
+    localStorage.removeItem(PLAYER_NAME_KEY);
+    localStorage.removeItem(PLAYER_TEAM_KEY);
+    localStorage.removeItem(NAME_DECLINED_KEY);
+    set({ playerName: null, playerTeam: null, nameDeclined: false });
+  },
 }));
