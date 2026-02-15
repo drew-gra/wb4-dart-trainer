@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useSessionStore, useAppStore } from '../../store/gameStore';
 import { Button } from '../ui/Button';
 import { GOLD_GRADIENT } from '../../utils/constants';
@@ -21,6 +21,23 @@ const modeLabels = {
   'solo-501': 'SOLO 501',
   'cricket': 'CRICKET'
 };
+
+// Gear icon SVG component
+const GearIcon = ({ size = 20 }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+);
 
 // Calculate total darts thrown across all sessions
 const calculateTotalDarts = (sessions) => {
@@ -135,11 +152,25 @@ const SessionRow = ({ s }) => {
 };
 
 export const History = ({ onBack }) => {
-  const [confirmClear, setConfirmClear] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [confirmStep, setConfirmStep] = useState(false);
+  const settingsRef = useRef(null);
   const repsSessions = useSessionStore(state => state.repsSessions);
   const soloSessions = useSessionStore(state => state.soloSessions);
   const clearSessions = useSessionStore(state => state.clearSessions);
   const showStatus = useAppStore(state => state.showStatus);
+
+  // Close settings dropdown on outside tap
+  useEffect(() => {
+    const handler = (e) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target)) {
+        setSettingsOpen(false);
+        setConfirmStep(false);
+      }
+    };
+    if (settingsOpen) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [settingsOpen]);
 
   // Combined sessions for unified metrics
   const allSessions = useMemo(() => [...repsSessions, ...soloSessions], [repsSessions, soloSessions]);
@@ -151,16 +182,69 @@ export const History = ({ onBack }) => {
 
   const handleClearAll = () => {
     clearSessions();
-    setConfirmClear(false);
+    setSettingsOpen(false);
+    setConfirmStep(false);
     showStatus('🧹 All data cleared');
   };
 
   return (
     <>
+      {/* History Header with Gear */}
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-bold text-pink-400">📊 HISTORY</h2>
+        <div className="relative" ref={settingsRef}>
+          <button
+            onClick={() => {
+              setSettingsOpen(!settingsOpen);
+              setConfirmStep(false);
+            }}
+            className={`p-2 rounded-lg transition-all ${
+              settingsOpen ? 'text-pink-400 bg-gray-800' : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <GearIcon size={22} />
+          </button>
+
+          {/* Settings Dropdown */}
+          {settingsOpen && (
+            <div className="absolute right-0 top-full mt-2 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50"
+              style={{ minWidth: '200px' }}
+            >
+              {!confirmStep ? (
+                <button
+                  onClick={() => setConfirmStep(true)}
+                  className="w-full text-left px-4 py-3 text-red-400 text-sm font-semibold hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                  🧹 Clear all data
+                </button>
+              ) : (
+                <div className="p-4">
+                  <p className="text-gray-300 text-sm mb-3">Delete all session history?</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleClearAll}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 rounded-md transition-colors"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={() => setConfirmStep(false)}
+                      className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm font-semibold py-2 rounded-md transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Session Counts */}
       <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
         <div className="flex items-baseline justify-between mb-3">
-          <h3 className="text-lg font-bold text-pink-400">📊 SESSIONS</h3>
+          <h3 className="text-lg font-bold text-pink-400">SESSIONS</h3>
           <span className="text-xs text-gray-500">{totalDarts.toLocaleString()} darts</span>
         </div>
         <div className="grid grid-cols-6 gap-2 text-center">
@@ -262,34 +346,6 @@ export const History = ({ onBack }) => {
           </p>
         </div>
       )}
-
-      {/* Clear Data */}
-      <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
-        <div className="flex items-start mb-3">
-          <input 
-            type="checkbox" 
-            id="confirmClear" 
-            checked={confirmClear} 
-            onChange={(e) => setConfirmClear(e.target.checked)} 
-            className="mt-1 mr-3 w-5 h-5 cursor-pointer" 
-          />
-          <label htmlFor="confirmClear" className="text-sm text-gray-300 cursor-pointer">
-            Delete all session history and start again.
-          </label>
-        </div>
-        <button 
-          onClick={handleClearAll} 
-          disabled={!confirmClear}
-          className={`w-full font-black py-3 px-6 rounded-lg transition-all border-2 shadow-lg ${
-            confirmClear 
-              ? 'bg-pink-600 hover:bg-pink-700 text-white border-pink-500 transform hover:scale-105 cursor-pointer' 
-              : 'bg-gray-700 text-gray-500 border-gray-600 cursor-not-allowed opacity-50'
-          }`}
-          style={confirmClear ? { textShadow: '2px 2px 4px rgba(0,0,0,0.8)' } : {}}
-        >
-          🧹 CLEAR ALL DATA
-        </button>
-      </div>
 
       {/* Back Button */}
       <Button 

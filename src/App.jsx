@@ -124,12 +124,14 @@ const App = () => {
       style={{ background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)' }}
     >
       <div className="max-w-md mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2" style={GOLD_GRADIENT}>
-            WB4: A Darts Practice App
-          </h1>
-        </div>
+        {/* Header - only on main menu */}
+        {currentMode === null && (
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold mb-2" style={GOLD_GRADIENT}>
+              WB4: A Darts Practice App
+            </h1>
+          </div>
+        )}
 
         {/* Main Menu */}
         {currentMode === null && (
