@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useSessionStore } from '../../store/gameStore';
 import { calculateDataSufficiency, calculateRegionalAnalysis } from '../../utils/heatmap';
-import { GOLD_GRADIENT } from '../../utils/constants';
+import { BOARD_REGIONS, GOLD_GRADIENT } from '../../utils/constants';
 
 // Home icon SVG component
 const HomeIcon = ({ size = 20 }) => (
@@ -169,7 +169,6 @@ export const Insights = ({ onBack }) => {
     );
   };
 
-  const hasTrendData = trending.trend3DA || trending.trendMPR;
 
   return (
     <>
@@ -218,19 +217,26 @@ export const Insights = ({ onBack }) => {
       {/* METRICS TRENDING — gold border, dominant element */}
       <div className="bg-gray-900 rounded-lg p-4 mb-6 border-2 border-yellow-500">
         <h3 className="text-lg font-bold mb-4 text-pink-400">METRICS TRENDING</h3>
-        {hasTrendData ? (
-          <div className="grid grid-cols-2 gap-3">
-            {trending.trend3DA && <TrendCard label="3DA" data={trending.trend3DA} />}
-            {trending.trendMPR && <TrendCard label="MPR" data={trending.trendMPR} />}
-          </div>
-        ) : (
-          <div className="py-6 text-center">
-            <p className="text-gray-500 text-sm">Insufficient Data</p>
-            <p className="text-gray-600 text-xs mt-1">
-              {trending.count3DA} of 50 (3DA) · {trending.countMPR} of 50 (MPR)
-            </p>
-          </div>
-        )}
+        <div className="grid grid-cols-2 gap-3">
+          {trending.trend3DA ? (
+            <TrendCard label="3DA" data={trending.trend3DA} />
+          ) : (
+            <div className="p-4 text-center">
+              <span className="text-sm font-bold text-gray-300">3DA</span>
+              <p className="text-gray-500 text-xs mt-3">Insufficient Data</p>
+              <p className="text-gray-600 text-xs mt-1">{trending.count3DA} of 50</p>
+            </div>
+          )}
+          {trending.trendMPR ? (
+            <TrendCard label="MPR" data={trending.trendMPR} />
+          ) : (
+            <div className="p-4 text-center">
+              <span className="text-sm font-bold text-gray-300">MPR</span>
+              <p className="text-gray-500 text-xs mt-3">Insufficient Data</p>
+              <p className="text-gray-600 text-xs mt-1">{trending.countMPR} of 50</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* PRACTICE FOCUS */}
@@ -238,10 +244,14 @@ export const Insights = ({ onBack }) => {
         <div className="bg-gray-900 rounded-lg p-5 border border-gray-800">
           <h3 className="text-lg font-bold mb-4 text-pink-400">PRACTICE FOCUS</h3>
           <div className="py-6 text-center">
-            <p className="text-gray-500 text-sm">Insufficient Data</p>
-            <p className="text-gray-600 text-xs mt-1">
-              {dataSufficiency.totalAttempts} of 360 instances
-            </p>
+            <p className="text-gray-500 text-sm mb-2">Insufficient Data</p>
+            {Object.entries(dataSufficiency.regionData)
+              .filter(([, darts]) => darts < 90)
+              .map(([key]) => (
+                <p key={key} className="text-gray-600 text-xs">
+                  {BOARD_REGIONS[key].name}: {dataSufficiency.regionData[key]} of 90
+                </p>
+              ))}
           </div>
         </div>
       ) : (
