@@ -2,7 +2,22 @@ import React from 'react';
 import { useSessionStore } from '../../store/gameStore';
 import { calculateDataSufficiency, calculateRegionalAnalysis } from '../../utils/heatmap';
 import { BOARD_REGIONS } from '../../utils/constants';
-import { Button } from '../ui/Button';
+// Home icon SVG component
+const HomeIcon = ({ size = 20 }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+  >
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    <polyline points="9 22 9 12 15 12 15 22" />
+  </svg>
+);
 
 export const Insights = ({ onBack }) => {
   const repsSessions = useSessionStore(state => state.repsSessions);
@@ -30,6 +45,17 @@ export const Insights = ({ onBack }) => {
 
   return (
     <>
+      {/* Insights Header with Home */}
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-bold text-pink-400">INSIGHTS</h2>
+        <button
+          onClick={onBack}
+          className="p-2 rounded-lg transition-all text-gray-500 hover:text-gray-300"
+        >
+          <HomeIcon size={22} />
+        </button>
+      </div>
+
       {!dataSufficiency.hasMinimum ? (
         // PROGRESS METER - Not enough data yet
         <div className="bg-gray-900 rounded-lg p-6 mb-6 border border-gray-800">
@@ -105,15 +131,6 @@ export const Insights = ({ onBack }) => {
         </div>
       )}
       
-      {/* Back button */}
-      <Button 
-        onClick={onBack}
-        className="w-full mt-8"
-        size="lg"
-        style={{ background: 'linear-gradient(145deg, #7c3aed, #5b21b6)' }}
-      >
-        ← BACK TO TRAINING
-      </Button>
     </>
   );
 };
