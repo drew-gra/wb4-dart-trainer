@@ -171,9 +171,11 @@ export const History = ({ onBack }) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [confirmStep, setConfirmStep] = useState(false);
   const settingsRef = useRef(null);
+  const fileInputRef = useRef(null);
   const repsSessions = useSessionStore(state => state.repsSessions);
   const soloSessions = useSessionStore(state => state.soloSessions);
   const clearSessions = useSessionStore(state => state.clearSessions);
+  const importSessions = useSessionStore(state => state.importSessions);
   const showStatus = useAppStore(state => state.showStatus);
 
   // Close settings dropdown on outside tap
@@ -201,6 +203,55 @@ export const History = ({ onBack }) => {
     setSettingsOpen(false);
     setConfirmStep(false);
     showStatus('🧹 All data cleared');
+  };
+
+  const handleExport = () => {
+    const exportData = {
+      version: '1.0',
+      app: 'wb4darts',
+      exportDate: new Date().toISOString(),
+      sessions: {
+        reps: repsSessions,
+        solo: soloSessions
+      }
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `wb4darts-export-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setSettingsOpen(false);
+    showStatus('📦 Data exported');
+  };
+
+  const handleImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+        if (data.app !== 'wb4darts' || !data.sessions) {
+          showStatus('❌ Invalid file format');
+          return;
+        }
+        const reps = Array.isArray(data.sessions.reps) ? data.sessions.reps : [];
+        const solo = Array.isArray(data.sessions.solo) ? data.sessions.solo : [];
+        if (reps.length === 0 && solo.length === 0) {
+          showStatus('❌ No session data found');
+          return;
+        }
+        importSessions(reps, solo);
+        setSettingsOpen(false);
+        showStatus(`✅ Imported ${reps.length + solo.length} sessions`);
+      } catch {
+        showStatus('❌ Could not read file');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   return (
@@ -234,12 +285,26 @@ export const History = ({ onBack }) => {
               style={{ minWidth: '200px' }}
             >
               {!confirmStep ? (
-                <button
-                  onClick={() => setConfirmStep(true)}
-                  className="w-full text-left px-4 py-3 text-red-400 text-sm font-semibold hover:bg-gray-800 rounded-lg transition-colors"
-                >
-                  Clear all data
-                </button>
+                <div>
+                  <button
+                    onClick={handleExport}
+                    className="w-full text-left px-4 py-3 text-gray-300 text-sm font-semibold hover:bg-gray-800 rounded-t-lg transition-colors"
+                  >
+                    Export data
+                  </button>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full text-left px-4 py-3 text-gray-300 text-sm font-semibold hover:bg-gray-800 transition-colors"
+                  >
+                    Import data
+                  </button>
+                  <button
+                    onClick={() => setConfirmStep(true)}
+                    className="w-full text-left px-4 py-3 text-red-400 text-sm font-semibold hover:bg-gray-800 rounded-b-lg transition-colors border-t border-gray-800"
+                  >
+                    Clear all data
+                  </button>
+                </div>
               ) : (
                 <div className="p-4">
                   <p className="text-gray-300 text-sm mb-3">Delete all session history?</p>
@@ -371,6 +436,14 @@ export const History = ({ onBack }) => {
         </div>
       )}
 
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        onChange={handleImport}
+        className="hidden"
+      />
     </>
   );
 };

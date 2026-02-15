@@ -87,6 +87,15 @@ export const useSessionStore = create((set, get) => ({
     set({ repsSessions: [], soloSessions: [] });
   },
   
+  // Import sessions (replaces current data)
+  importSessions: (repsSessions, soloSessions) => {
+    const reps = repsSessions.slice(0, MAX_PER_BUCKET);
+    const solo = soloSessions.slice(0, MAX_PER_BUCKET);
+    localStorage.setItem(REPS_KEY, JSON.stringify(reps));
+    localStorage.setItem(SOLO_KEY, JSON.stringify(solo));
+    set({ repsSessions: reps, soloSessions: solo });
+  },
+
   // Get sessions by mode (searches correct bucket)
   getSessionsByMode: (mode) => {
     const state = get();
