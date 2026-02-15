@@ -1,9 +1,9 @@
 import React, { useEffect } from 'react';
 import { useSessionStore, useAppStore } from './store/gameStore';
 import { trackEvent } from './utils/analytics';
-import { MENU_CATEGORIES, REPS_MODES, SOLO_MODES, GOLD_GRADIENT } from './utils/constants';
+import { REPS_MODES, SOLO_MODES } from './utils/constants';
 import { DoubleIn, DoubleOut, Triples, First9, Cricket, Solo501, History, Insights } from './components/modes';
-import { Button } from './components/ui/Button';
+import MainMenu from './components/ui/MainMenu';
 
 const App = () => {
   const currentMode = useAppStore(state => state.currentMode);
@@ -16,16 +16,9 @@ const App = () => {
     loadSessions();
   }, []);
 
-
-
   const handleModeChange = (mode) => {
     setMode(mode);
     trackEvent('Mode Changed', { mode });
-  };
-
-  const handleCategoryClick = (category) => {
-    if (category.disabled) return;
-    handleModeChange(category.defaultMode);
   };
 
   // Determine which category the current mode belongs to
@@ -124,66 +117,9 @@ const App = () => {
       style={{ background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)' }}
     >
       <div className="max-w-md mx-auto">
-        {/* Header - only on main menu */}
-        {currentMode === null && (
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold mb-2" style={GOLD_GRADIENT}>
-              WB4: A Darts Practice App
-            </h1>
-          </div>
-        )}
-
         {/* Main Menu */}
         {currentMode === null && (
-          <div className="space-y-4 mb-8">
-            {/* Practice Categories */}
-            {MENU_CATEGORIES.map((category) => (
-              <button
-                key={category.id}
-                onClick={() => handleCategoryClick(category)}
-                disabled={category.disabled}
-                className={`w-full py-6 px-6 rounded-lg text-center transition-all shadow-xl border-2 border-pink-400 ${
-                  category.disabled 
-                    ? 'cursor-not-allowed' 
-                    : 'hover:border-pink-300 transform hover:scale-105'
-                }`}
-                style={{ background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)' }}
-              >
-                <div 
-                  className="text-2xl font-black"
-                  style={GOLD_GRADIENT}
-                >
-                  {category.label}
-                  {category.comingSoon && <span className="text-sm font-normal text-gray-400 ml-2">(Coming soon)</span>}
-                </div>
-              </button>
-            ))}
-            
-            {/* Browser Storage Info */}
-            <div className="pt-2">
-              <p className="text-sm text-gray-300 text-center">
-                Your practice history is saved to this device automatically. No account needed.
-              </p>
-            </div>
-
-            {/* History & Insights */}
-            <div className="grid grid-cols-2 gap-4 pt-2">
-              <button
-                onClick={() => handleModeChange('history')}
-                className="w-full py-4 px-6 rounded-lg font-bold text-base transition-all transform hover:scale-105 shadow-lg border-2 border-gray-300"
-                style={{ background: 'linear-gradient(145deg, #7c3aed, #5b21b6)' }}
-              >
-                📊 HISTORY
-              </button>
-              <button
-                onClick={() => handleModeChange('insights')}
-                className="w-full py-4 px-6 rounded-lg font-bold text-base transition-all transform hover:scale-105 shadow-lg border-2 border-gray-300"
-                style={{ background: 'linear-gradient(145deg, #7c3aed, #5b21b6)' }}
-              >
-                💡 INSIGHTS
-              </button>
-            </div>
-          </div>
+          <MainMenu onModeChange={handleModeChange} />
         )}
 
         {/* Tab Navigation for Reps/Solo modes */}
@@ -200,8 +136,6 @@ const App = () => {
             </div>
           </div>
         )}
-
-
 
         {/* Footer */}
         <div className="text-center mt-12 mb-12">
