@@ -117,12 +117,11 @@ export const DoubleOut = () => {
       {/* Target Display - no box */}
       <div className="text-center mb-8">
         <div className="text-6xl font-black mb-4" style={GOLD_GRADIENT}>
-          {currentTarget ? displayTarget : '...'}
+          {currentTarget ? `Hit ${displayTarget}` : '...'}
         </div>
-        <p className="text-gray-400 text-sm">This is your out. You have three darts.</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mb-4">
+      <div className="grid grid-cols-2 gap-2 mb-4">
         <ActionButton 
           icon="✅" 
           label="HIT IT!" 
@@ -133,12 +132,6 @@ export const DoubleOut = () => {
           icon="❌" 
           label="MISSED" 
           onClick={() => recordAttempt('fail')}
-          disabled={!currentTarget}
-        />
-        <ActionButton 
-          icon="➡️" 
-          label="SKIP" 
-          onClick={skipTarget}
           disabled={!currentTarget}
         />
       </div>

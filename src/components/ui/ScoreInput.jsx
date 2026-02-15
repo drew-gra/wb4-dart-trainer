@@ -4,6 +4,10 @@ const PURPLE_GRADIENT = {
   background: 'linear-gradient(145deg, #7c3aed, #5b21b6)'
 };
 
+const GOLD_GRADIENT_BG = {
+  background: 'linear-gradient(45deg, #ffd700, #ffed4a)'
+};
+
 /**
  * Parse calculator display into total
  * Supports: "60", "60+45", "20×3"
@@ -131,8 +135,8 @@ export const ScoreInput = ({
             <button 
               onClick={() => handleScore()} 
               disabled={!hasInput}
-              className={`${btnBase} ${!hasInput ? grayBg + ' text-gray-600' : ''}`}
-              style={hasInput ? PURPLE_GRADIENT : {}}
+              className={`${btnBase} ${!hasInput ? grayBg + ' text-gray-600' : 'text-black'}`}
+              style={hasInput ? GOLD_GRADIENT_BG : {}}
             >
               Score
             </button>
@@ -157,6 +161,14 @@ export const ScoreInput = ({
                 <button onClick={handleZero} className={`${btnBase} ${grayBg} border-r border-gray-700`}>0</button>
                 <button onClick={handlePlus} className={`${btnBase} ${grayBg}`}>+</button>
               </>
+            ) : isDoubleIn ? (
+              <button 
+                onClick={handleBust} 
+                className={`${btnBase} col-span-3`}
+                style={PURPLE_GRADIENT}
+              >
+                Missed
+              </button>
             ) : (
               <>
                 <button className={`${btnBase} ${grayBg} border-r border-gray-700 cursor-default`}>🤜</button>
