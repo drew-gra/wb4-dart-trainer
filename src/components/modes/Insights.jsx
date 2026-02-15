@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useSessionStore } from '../../store/gameStore';
 import { calculateDataSufficiency, calculateRegionalAnalysis } from '../../utils/heatmap';
-import { BOARD_REGIONS } from '../../utils/constants';
+import { BOARD_REGIONS, GOLD_GRADIENT } from '../../utils/constants';
+
 // Home icon SVG component
 const HomeIcon = ({ size = 20 }) => (
   <svg 
@@ -19,18 +20,115 @@ const HomeIcon = ({ size = 20 }) => (
   </svg>
 );
 
+// Trend arrow component
+const TrendArrow = ({ direction }) => {
+  if (direction === 'hot') return <span className="text-base text-green-400">▲</span>;
+  if (direction === 'cold') return <span className="text-base text-red-400">▼</span>;
+  return <span className="text-base text-gray-500">—</span>;
+};
+
+// Calculate unified metrics from sessions
+const calculateUnifiedMetrics = (sessions) => {
+  const diSessions = sessions.filter(s => s.mode === 'double-in');
+  const diTotal = diSessions.reduce((sum, s) => sum + s.totalAttempts, 0);
+  const diSuccesses = diSessions.reduce((sum, s) => sum + s.successes, 0);
+  const doubleInPct = diTotal > 0 ? Math.round((diSuccesses / diTotal) * 100) : '-';
+
+  const doSessions = sessions.filter(s => s.mode === 'double-out');
+  const doTotal = doSessions.reduce((sum, s) => sum + s.totalAttempts, 0);
+  const doSuccesses = doSessions.reduce((sum, s) => sum + s.successes, 0);
+  const s501Sessions = sessions.filter(s => s.mode === 'solo-501' && s.checkoutAttempts);
+  const s501Total = s501Sessions.reduce((sum, s) => sum + s.checkoutAttempts, 0);
+  const s501Successes = s501Sessions.reduce((sum, s) => sum + s.checkoutSuccesses, 0);
+  const coTotal = doTotal + s501Total;
+  const coSuccesses = doSuccesses + s501Successes;
+  const checkoutPct = coTotal > 0 ? Math.round((coSuccesses / coTotal) * 100) : '-';
+
+  const solo501Sessions = sessions.filter(s => s.mode === 'solo-501' && s.avg3DA);
+  const first9Sessions = sessions.filter(s => s.mode === 'first-9' && s.avg3DA);
+  const all3DASessions = [...solo501Sessions, ...first9Sessions];
+  const unified3DA = all3DASessions.length > 0
+    ? (all3DASessions.reduce((sum, s) => sum + s.avg3DA, 0) / all3DASessions.length).toFixed(1)
+    : '-';
+
+  const tripsSessions = sessions.filter(s => s.mode === 'triples');
+  const tripsMarks = tripsSessions.reduce((sum, s) => sum + (parseFloat(s.avgRounds) * s.totalAttempts), 0);
+  const tripsRounds = tripsSessions.reduce((sum, s) => sum + s.totalAttempts, 0);
+  const cricketSessions = sessions.filter(s => s.mode === 'cricket');
+  const cricketMarks = cricketSessions.reduce((sum, s) => sum + (s.totalMarks || 21), 0);
+  const cricketRounds = cricketSessions.reduce((sum, s) => sum + (s.throws / 3), 0);
+  const totalMarks = tripsMarks + cricketMarks;
+  const totalRounds = tripsRounds + cricketRounds;
+  const unifiedMPR = totalRounds > 0 ? (totalMarks / totalRounds).toFixed(2) : '-';
+
+  return { doubleInPct, checkoutPct, unified3DA, unifiedMPR };
+};
+
+// Calculate trending — last 10 sessions vs overall, requires 50+ qualifying sessions
+const calculateTrending = (sessions) => {
+  const WINDOW = 10;
+  const MIN_SESSIONS = 50;
+
+  // 3DA trending (Solo 501 + First 9)
+  const all3DA = sessions
+    .filter(s => (s.mode === 'solo-501' || s.mode === 'first-9') && s.avg3DA)
+    .sort((a, b) => new Date(b.endTime) - new Date(a.endTime));
+
+  let trend3DA = null;
+  if (all3DA.length >= MIN_SESSIONS) {
+    const recent = all3DA.slice(0, WINDOW);
+    const recentAvg = recent.reduce((sum, s) => sum + s.avg3DA, 0) / recent.length;
+    const overallAvg = all3DA.reduce((sum, s) => sum + s.avg3DA, 0) / all3DA.length;
+    const delta = recentAvg - overallAvg;
+    trend3DA = {
+      recent: recentAvg.toFixed(1),
+      overall: overallAvg.toFixed(1),
+      delta: delta.toFixed(1),
+      direction: delta > 0.5 ? 'hot' : delta < -0.5 ? 'cold' : 'steady',
+    };
+  }
+
+  // MPR trending (Triples + Cricket)
+  const allMPR = sessions
+    .filter(s => (s.mode === 'triples' && s.avgRounds) || (s.mode === 'cricket' && s.mpr))
+    .sort((a, b) => new Date(b.endTime) - new Date(a.endTime))
+    .map(s => ({
+      ...s,
+      mprValue: s.mode === 'cricket' ? s.mpr : parseFloat(s.avgRounds),
+    }));
+
+  let trendMPR = null;
+  if (allMPR.length >= MIN_SESSIONS) {
+    const recent = allMPR.slice(0, WINDOW);
+    const recentAvg = recent.reduce((sum, s) => sum + s.mprValue, 0) / recent.length;
+    const overallAvg = allMPR.reduce((sum, s) => sum + s.mprValue, 0) / allMPR.length;
+    const delta = recentAvg - overallAvg;
+    trendMPR = {
+      recent: recentAvg.toFixed(2),
+      overall: overallAvg.toFixed(2),
+      delta: delta.toFixed(2),
+      direction: delta > 0.05 ? 'hot' : delta < -0.05 ? 'cold' : 'steady',
+    };
+  }
+
+  return { trend3DA, trendMPR };
+};
+
 export const Insights = ({ onBack }) => {
   const repsSessions = useSessionStore(state => state.repsSessions);
   const soloSessions = useSessionStore(state => state.soloSessions);
-  const sessions = [...repsSessions, ...soloSessions];
-  
-  const dataSufficiency = calculateDataSufficiency(sessions);
-  const regionalAnalysis = calculateRegionalAnalysis(sessions);
-  
+  const allSessions = useMemo(() => [...repsSessions, ...soloSessions], [repsSessions, soloSessions]);
+
+  const metrics = useMemo(() => calculateUnifiedMetrics(allSessions), [allSessions]);
+  const trending = useMemo(() => calculateTrending(allSessions), [allSessions]);
+
+  const dataSufficiency = calculateDataSufficiency(allSessions);
+  const regionalAnalysis = calculateRegionalAnalysis(allSessions);
+
   const sortedRegions = Object.entries(regionalAnalysis).sort((a, b) => a[1].score - b[1].score);
   const weakest = sortedRegions[0];
   const strongest = sortedRegions[sortedRegions.length - 1];
-  
+
   const meanScore = sortedRegions.reduce((sum, r) => sum + r[1].score, 0) / sortedRegions.length;
 
   const getRegionDescription = (name) => {
@@ -42,6 +140,36 @@ export const Insights = ({ onBack }) => {
       default: return name;
     }
   };
+
+  const TrendCard = ({ label, data }) => {
+    if (!data) return null;
+    const deltaColor = data.direction === 'hot'
+      ? 'text-orange-400'
+      : data.direction === 'cold'
+      ? 'text-blue-400'
+      : 'text-gray-400';
+    const sign = parseFloat(data.delta) > 0 ? '+' : '';
+
+    return (
+      <div className="p-4 text-center">
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <span className="text-sm font-bold text-gray-300">{label}</span>
+          <TrendArrow direction={data.direction} />
+        </div>
+        <div className="flex items-baseline justify-center gap-2 mb-1">
+          <span className="text-2xl font-black text-white">{data.recent}</span>
+          <span className={`text-sm font-bold ${deltaColor}`}>
+            {sign}{data.delta}
+          </span>
+        </div>
+        <div className="text-xs text-gray-500">
+          vs {data.overall} overall (last 10)
+        </div>
+      </div>
+    );
+  };
+
+  const hasTrendData = trending.trend3DA || trending.trendMPR;
 
   return (
     <>
@@ -56,19 +184,65 @@ export const Insights = ({ onBack }) => {
         </button>
       </div>
 
+      {/* YOUR METRICS */}
+      <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
+        <h3 className="text-lg font-bold mb-4 text-pink-400">YOUR METRICS</h3>
+        <div className="grid grid-cols-4 gap-2 text-center">
+          <div>
+            <div className="text-xs text-gray-300 font-medium mb-1">DI %</div>
+            <div className="text-2xl font-black" style={GOLD_GRADIENT}>
+              {metrics.doubleInPct}{metrics.doubleInPct !== '-' && '%'}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-300 font-medium mb-1">CO %</div>
+            <div className="text-2xl font-black" style={GOLD_GRADIENT}>
+              {metrics.checkoutPct}{metrics.checkoutPct !== '-' && '%'}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-300 font-medium mb-1">3DA</div>
+            <div className="text-2xl font-black" style={GOLD_GRADIENT}>
+              {metrics.unified3DA}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-300 font-medium mb-1">MPR</div>
+            <div className="text-2xl font-black" style={GOLD_GRADIENT}>
+              {metrics.unifiedMPR}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* METRICS TRENDING — gold border, dominant element */}
+      <div className="bg-gray-900 rounded-lg p-4 mb-6 border-2 border-yellow-500">
+        <h3 className="text-lg font-bold mb-4 text-pink-400">METRICS TRENDING</h3>
+        {hasTrendData ? (
+          <div className="grid grid-cols-2 gap-3">
+            {trending.trend3DA && <TrendCard label="3DA" data={trending.trend3DA} />}
+            {trending.trendMPR && <TrendCard label="MPR" data={trending.trendMPR} />}
+          </div>
+        ) : (
+          <div className="py-6 text-center">
+            <p className="text-gray-500 text-sm">Insufficient Data</p>
+          </div>
+        )}
+      </div>
+
+      {/* YOUR PRACTICE FOCUS */}
       {!dataSufficiency.hasMinimum ? (
-        // PROGRESS METER - Not enough data yet
         <div className="bg-gray-900 rounded-lg p-6 mb-6 border border-gray-800">
           <h3 className="text-base font-bold mb-4 text-pink-400">
-            ⚠ NOT ENOUGH DATA FOR RECOMMENDATIONS
+            YOUR PRACTICE FOCUS
           </h3>
-          
+
           <p className="text-sm text-gray-300 mb-6">
             Good news: You need to throw more darts!<br/><br/>
-            I need more data to provide real advice. Once these thresholds are met, 
+            I need more data to provide real advice. Once these thresholds are met,
             I can tell you what the data says you should work on.
           </p>
-          
+
           <div className="mb-6">
             <div className="flex justify-between mb-2">
               <span className="text-sm text-gray-300">Total Darts</span>
@@ -77,7 +251,7 @@ export const Insights = ({ onBack }) => {
               </span>
             </div>
             <div className="w-full bg-gray-700 rounded-full h-4">
-              <div 
+              <div
                 className={`h-4 rounded-full transition-all ${
                   dataSufficiency.totalAttempts >= 360 ? 'bg-purple-600' : 'bg-yellow-500'
                 }`}
@@ -98,39 +272,20 @@ export const Insights = ({ onBack }) => {
           </div>
         </div>
       ) : (
-        // RECOMMENDATION - Enough data
-        <div 
-          className="rounded-lg p-6 border-2"
-          style={{
-            background: 'linear-gradient(145deg, #374151, #1f2937)',
-            borderColor: '#fbbf24'
-          }}
-        >
-          <h3 className="text-2xl font-bold mb-4 text-pink-400">💡 YOUR PRACTICE FOCUS</h3>
-          <p className="text-lg text-white mb-6">
-            The data says you need to work on {getRegionDescription(weakest[1].name)}. 
-            Your efficiency there is {((meanScore - weakest[1].score) / meanScore * 100).toFixed(0)}% 
+        <div className="bg-gray-900 rounded-lg p-5 border border-gray-800">
+          <h3 className="text-lg font-bold mb-3 text-pink-400">YOUR PRACTICE FOCUS</h3>
+          <p className="text-sm text-gray-300 mb-4">
+            The data says you need to work on {getRegionDescription(weakest[1].name)}.
+            Your efficiency there is {((meanScore - weakest[1].score) / meanScore * 100).toFixed(0)}%
             lower than everyplace else on the board.
-            <br/><br/>
-            Your strongest area is {getRegionDescription(strongest[1].name)}, 
-            where your efficiency is {((strongest[1].score - meanScore) / meanScore * 100).toFixed(0)}% 
+          </p>
+          <p className="text-sm text-gray-400">
+            Your strongest area is {getRegionDescription(strongest[1].name)},
+            where your efficiency is {((strongest[1].score - meanScore) / meanScore * 100).toFixed(0)}%
             greater than the other areas.
           </p>
-          <button 
-            className="w-full py-3 px-4 rounded-lg font-bold text-base transition-all border-2"
-            style={{
-              backgroundColor: '#1f2937',
-              borderColor: '#fbbf24',
-              color: '#9ca3af',
-              cursor: 'not-allowed'
-            }}
-            disabled
-          >
-            🎯 TARGETED PRACTICE MODE (COMING SOON)
-          </button>
         </div>
       )}
-      
     </>
   );
 };
