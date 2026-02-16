@@ -1,154 +1,167 @@
-import React, { useEffect } from 'react';
-import { useSessionStore, useAppStore } from './store/gameStore';
-import { trackEvent } from './utils/analytics';
-import { REPS_MODES, SOLO_MODES } from './utils/constants';
-import { DoubleIn, DoubleOut, Triples, First9, Cricket, Solo501, History, Insights } from './components/modes';
-import MainMenu from './components/ui/MainMenu';
+import { create } from 'zustand';
 
-const App = () => {
-  const currentMode = useAppStore(state => state.currentMode);
-  const setMode = useAppStore(state => state.setMode);
-  const saveStatus = useAppStore(state => state.saveStatus);
-  const loadSessions = useSessionStore(state => state.loadSessions);
-  const loadPlayerInfo = useAppStore(state => state.loadPlayerInfo);
+const LEGACY_KEY = 'wb4UnifiedSessionHistory';
+const REPS_KEY = 'wb4RepsSessions';
+const SOLO_KEY = 'wb4SoloSessions';
+const PLAYER_NAME_KEY = 'wb4_player_name';
+const PLAYER_TEAM_KEY = 'wb4_player_team';
+const NAME_DECLINED_KEY = 'wb4_name_declined';
+const MAX_PER_BUCKET = 100;
 
-  // Load sessions + player info on mount
-  useEffect(() => {
-    loadSessions();
-    loadPlayerInfo();
-  }, []);
+// Mode classification
+const SOLO_MODES = new Set(['solo-501', 'cricket']);
+const isSoloMode = (mode) => SOLO_MODES.has(mode);
 
-  const handleModeChange = (mode) => {
-    setMode(mode);
-    trackEvent('Mode Changed', { mode });
-  };
-
-  // Determine which category the current mode belongs to
-  const isRepsMode = REPS_MODES.some(m => m.id === currentMode);
-  const isSoloMode = SOLO_MODES.some(m => m.id === currentMode);
-
-  const renderModeContent = () => {
-    switch (currentMode) {
-      case 'double-in': return <DoubleIn />;
-      case 'double-out': return <DoubleOut />;
-      case 'triples': return <Triples />;
-      case 'first-9': return <First9 />;
-      case 'cricket': return <Cricket />;
-      case 'solo-501': return <Solo501 />;
-      case 'history': return <History onBack={() => handleModeChange(null)} />;
-      case 'insights': return <Insights onBack={() => handleModeChange(null)} />;
-      default: return null;
+/**
+ * Central store for session history
+ * 
+ * Sessions are stored in two buckets:
+ * - Reps: double-in, double-out, triples, first-9
+ * - Solo: solo-501, cricket
+ * Each bucket retains up to 100 sessions (200 total).
+ * Unified metrics are calculated from both buckets combined.
+ */
+export const useSessionStore = create((set, get) => ({
+  repsSessions: [],
+  soloSessions: [],
+  
+  // Combined getter for unified metrics
+  get sessions() {
+    // Note: Zustand doesn't support native getters this way.
+    // Use getAllSessions() instead, or access via the selector pattern.
+  },
+  
+  getAllSessions: () => {
+    const state = get();
+    return [...state.repsSessions, ...state.soloSessions];
+  },
+  
+  // Load sessions from localStorage (with migration from legacy key)
+  loadSessions: () => {
+    try {
+      const legacyData = localStorage.getItem(LEGACY_KEY);
+      
+      if (legacyData) {
+        // One-time migration: split legacy sessions into buckets
+        const legacy = JSON.parse(legacyData);
+        const reps = legacy.filter(s => !isSoloMode(s.mode)).slice(0, MAX_PER_BUCKET);
+        const solo = legacy.filter(s => isSoloMode(s.mode)).slice(0, MAX_PER_BUCKET);
+        
+        localStorage.setItem(REPS_KEY, JSON.stringify(reps));
+        localStorage.setItem(SOLO_KEY, JSON.stringify(solo));
+        localStorage.removeItem(LEGACY_KEY);
+        
+        set({ repsSessions: reps, soloSessions: solo });
+        return;
+      }
+      
+      const savedReps = localStorage.getItem(REPS_KEY);
+      const savedSolo = localStorage.getItem(SOLO_KEY);
+      
+      set({
+        repsSessions: savedReps ? JSON.parse(savedReps) : [],
+        soloSessions: savedSolo ? JSON.parse(savedSolo) : [],
+      });
+    } catch (e) {
+      console.error('Error loading sessions:', e);
     }
-  };
+  },
+  
+  // Add a new session (routed to correct bucket by mode)
+  addSession: (sessionData) => {
+    set(state => {
+      if (isSoloMode(sessionData.mode)) {
+        const updated = [sessionData, ...state.soloSessions].slice(0, MAX_PER_BUCKET);
+        localStorage.setItem(SOLO_KEY, JSON.stringify(updated));
+        return { soloSessions: updated };
+      } else {
+        const updated = [sessionData, ...state.repsSessions].slice(0, MAX_PER_BUCKET);
+        localStorage.setItem(REPS_KEY, JSON.stringify(updated));
+        return { repsSessions: updated };
+      }
+    });
+  },
+  
+  // Clear all sessions
+  clearSessions: () => {
+    localStorage.removeItem(REPS_KEY);
+    localStorage.removeItem(SOLO_KEY);
+    localStorage.removeItem(LEGACY_KEY); // clean up if somehow still present
+    set({ repsSessions: [], soloSessions: [] });
+  },
+  
+  // Import sessions (replaces current data)
+  importSessions: (repsSessions, soloSessions) => {
+    const reps = repsSessions.slice(0, MAX_PER_BUCKET);
+    const solo = soloSessions.slice(0, MAX_PER_BUCKET);
+    localStorage.setItem(REPS_KEY, JSON.stringify(reps));
+    localStorage.setItem(SOLO_KEY, JSON.stringify(solo));
+    set({ repsSessions: reps, soloSessions: solo });
+  },
 
-  const renderTabNavigation = () => {
-    if (isRepsMode) {
-      return (
-        <div className="mb-8">
-          <div className="flex items-center gap-2">
-            <div className="flex gap-1 bg-gray-900 p-1 rounded-lg border border-gray-800 flex-1">
-              {REPS_MODES.map((mode) => (
-                <button
-                  key={mode.id}
-                  onClick={() => handleModeChange(mode.id)}
-                  className={`flex-1 py-3 px-2 rounded-md text-xs font-bold transition-all duration-300 ${
-                    currentMode === mode.id 
-                      ? 'text-black shadow-lg transform scale-105' 
-                      : 'text-gray-400 hover:text-gray-200'
-                  }`}
-                  style={currentMode === mode.id 
-                    ? { background: 'linear-gradient(45deg, #ffd700, #ffed4a)' }
-                    : { background: 'transparent' }
-                  }
-                >
-                  {mode.label}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => handleModeChange(null)}
-              className="p-3 rounded-lg text-gray-400 hover:text-gray-200 bg-gray-900 border border-gray-800 transition-all"
-            >
-              ⌂
-            </button>
-          </div>
-        </div>
-      );
+  // Get sessions by mode (searches correct bucket)
+  getSessionsByMode: (mode) => {
+    const state = get();
+    const bucket = isSoloMode(mode) ? state.soloSessions : state.repsSessions;
+    return bucket.filter(s => s.mode === mode);
+  }
+}));
+
+/**
+ * Store for current app state (mode, UI state, player identity)
+ * 
+ * Player name/team persist independently from session data.
+ * Clearing sessions does NOT clear player identity.
+ */
+export const useAppStore = create((set) => ({
+  currentMode: null,
+  saveStatus: '',
+  playerName: null,
+  playerTeam: null,
+  nameDeclined: false,
+  
+  setMode: (mode) => set({ currentMode: mode }),
+  
+  showStatus: (message, timeout = 2000) => {
+    set({ saveStatus: message });
+    setTimeout(() => set({ saveStatus: '' }), timeout);
+  },
+
+  // Load player identity from localStorage
+  loadPlayerInfo: () => {
+    try {
+      const name = localStorage.getItem(PLAYER_NAME_KEY);
+      const team = localStorage.getItem(PLAYER_TEAM_KEY);
+      const declined = localStorage.getItem(NAME_DECLINED_KEY);
+      set({
+        playerName: name || null,
+        playerTeam: team || null,
+        nameDeclined: declined === 'true',
+      });
+    } catch (e) {
+      console.error('Error loading player info:', e);
     }
-    
-    if (isSoloMode) {
-      return (
-        <div className="mb-8">
-          <div className="flex items-center gap-2">
-            <div className="flex gap-1 bg-gray-900 p-1 rounded-lg border border-gray-800 flex-1">
-              {SOLO_MODES.map((mode) => (
-                <button
-                  key={mode.id}
-                  onClick={() => handleModeChange(mode.id)}
-                  className={`flex-1 py-3 px-2 rounded-md text-xs font-bold transition-all duration-300 ${
-                    currentMode === mode.id 
-                      ? 'text-black shadow-lg transform scale-105' 
-                      : 'text-gray-400 hover:text-gray-200'
-                  }`}
-                  style={currentMode === mode.id 
-                    ? { background: 'linear-gradient(45deg, #ffd700, #ffed4a)' }
-                    : { background: 'transparent' }
-                  }
-                >
-                  {mode.label}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => handleModeChange(null)}
-              className="p-3 rounded-lg text-gray-400 hover:text-gray-200 bg-gray-900 border border-gray-800 transition-all"
-            >
-              ⌂
-            </button>
-          </div>
-        </div>
-      );
-    }
-    
-    return null;
-  };
+  },
 
-  return (
-    <div 
-      className="min-h-screen bg-black text-white p-4"
-      style={{ background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)' }}
-    >
-      <div className="max-w-md mx-auto">
-        {/* Main Menu */}
-        {currentMode === null && (
-          <MainMenu onModeChange={handleModeChange} />
-        )}
+  // Set player name + team
+  setPlayerInfo: (name, team) => {
+    if (name) localStorage.setItem(PLAYER_NAME_KEY, name);
+    if (team) localStorage.setItem(PLAYER_TEAM_KEY, team);
+    localStorage.removeItem(NAME_DECLINED_KEY);
+    set({ playerName: name || null, playerTeam: team || null, nameDeclined: false });
+  },
 
-        {/* Tab Navigation for Reps/Solo modes */}
-        {renderTabNavigation()}
+  // User declined to enter name
+  declineName: () => {
+    localStorage.setItem(NAME_DECLINED_KEY, 'true');
+    set({ nameDeclined: true });
+  },
 
-        {/* Mode Content */}
-        {renderModeContent()}
-
-        {/* Save Status */}
-        {saveStatus && (
-          <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
-            <div className="text-xs text-center text-yellow-300 font-semibold">
-              {saveStatus}
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="text-center mt-12 mb-12">
-          <div className="text-4xl" style={{ letterSpacing: '0.5em' }}>🤜👈</div>
-        </div>
-        <div className="text-center text-yellow-400 text-xs font-semibold leading-tight">
-          <p>All rights reserved.</p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default App;
+  // Clear player identity (from settings)
+  clearPlayerInfo: () => {
+    localStorage.removeItem(PLAYER_NAME_KEY);
+    localStorage.removeItem(PLAYER_TEAM_KEY);
+    localStorage.removeItem(NAME_DECLINED_KEY);
+    set({ playerName: null, playerTeam: null, nameDeclined: false });
+  },
+}));
