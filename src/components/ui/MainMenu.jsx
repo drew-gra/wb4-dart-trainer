@@ -14,7 +14,7 @@ const MainMenu = ({ onModeChange }) => {
       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold mb-2" style={GOLD_GRADIENT}>
-          WB4: A Farts Practice App
+          WB4 Darts Practice App
         </h1>
       </div>
 
