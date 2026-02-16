@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useSessionStore, useAppStore } from '../../store/gameStore';
 import { GOLD_GRADIENT } from '../../utils/constants';
+import { NamePromptOverlay } from '../ui/Overlay';
+import { ShareButton, SharePreviewOverlay } from '../ui/ShareTile';
 
 // Static lookup tables (defined outside component to avoid recreation)
 const modeColors = {
@@ -170,6 +172,8 @@ const SessionRow = ({ s }) => {
 export const History = ({ onBack }) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [confirmStep, setConfirmStep] = useState(false);
+  const [namePromptOpen, setNamePromptOpen] = useState(false);
+  const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
   const settingsRef = useRef(null);
   const fileInputRef = useRef(null);
   const repsSessions = useSessionStore(state => state.repsSessions);
@@ -177,6 +181,11 @@ export const History = ({ onBack }) => {
   const clearSessions = useSessionStore(state => state.clearSessions);
   const importSessions = useSessionStore(state => state.importSessions);
   const showStatus = useAppStore(state => state.showStatus);
+  const playerName = useAppStore(state => state.playerName);
+  const playerTeam = useAppStore(state => state.playerTeam);
+  const nameDeclined = useAppStore(state => state.nameDeclined);
+  const setPlayerInfo = useAppStore(state => state.setPlayerInfo);
+  const declineName = useAppStore(state => state.declineName);
 
   // Close settings dropdown on outside tap
   useEffect(() => {
@@ -197,6 +206,27 @@ export const History = ({ onBack }) => {
   const metrics = useMemo(() => calculateUnifiedMetrics(allSessions), [allSessions]);
   const totalDarts = useMemo(() => calculateTotalDarts(allSessions), [allSessions]);
   const sessionCounts = useMemo(() => calculateSessionCounts(allSessions), [allSessions]);
+
+  // Share flow
+  const handleShareTap = () => {
+    if (!playerName && !nameDeclined) {
+      setNamePromptOpen(true);
+    } else {
+      setSharePreviewOpen(true);
+    }
+  };
+
+  const handleNameSubmit = (name, team) => {
+    setPlayerInfo(name, team || null);
+    setNamePromptOpen(false);
+    setSharePreviewOpen(true);
+  };
+
+  const handleNameSkip = () => {
+    declineName();
+    setNamePromptOpen(false);
+    setSharePreviewOpen(true);
+  };
 
   const handleClearAll = () => {
     clearSessions();
@@ -376,9 +406,12 @@ export const History = ({ onBack }) => {
         </div>
       </div>
 
-      {/* Universal Metrics */}
+      {/* Universal Metrics — with Share button */}
       <div className="bg-gray-900 rounded-lg p-4 mb-6 border-2 border-yellow-500">
-        <h3 className="text-lg font-bold mb-4 text-pink-400">YOUR METRICS</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-pink-400">YOUR METRICS</h3>
+          <ShareButton onClick={handleShareTap} />
+        </div>
         <div className="grid grid-cols-4 gap-2 text-center">
           <div>
             <div className="text-xs text-gray-300 font-medium mb-1">DI %</div>
@@ -443,6 +476,22 @@ export const History = ({ onBack }) => {
         accept=".json"
         onChange={handleImport}
         className="hidden"
+      />
+
+      {/* Share flow overlays */}
+      <NamePromptOverlay
+        isOpen={namePromptOpen}
+        onSubmit={handleNameSubmit}
+        onSkip={handleNameSkip}
+      />
+
+      <SharePreviewOverlay
+        isOpen={sharePreviewOpen}
+        onClose={() => setSharePreviewOpen(false)}
+        metrics={metrics}
+        playerName={playerName}
+        playerTeam={playerTeam}
+        totalDarts={totalDarts}
       />
     </>
   );
