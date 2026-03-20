@@ -39,15 +39,9 @@ export const calculateTriplesStats = (attempts) => {
 export const calculateCricketStats = (games) => {
   const total = games.length;
   
-  // Calculate average MPR from games that have it, or compute from throws
-  const mprs = games.map(g => {
-    if (g.mpr) return g.mpr;
-    // Fallback for old games: 21 marks / (throws / 3) = 63 / throws
-    return g.throws > 0 ? (63 / g.throws) : 0;
-  });
-  
-  const avgMPR = total > 0 ? (mprs.reduce((sum, m) => sum + m, 0) / total).toFixed(2) : '0.00';
   const totalThrows = games.reduce((sum, g) => sum + (g.throws || 0), 0);
+  const totalMarks = games.reduce((sum, g) => sum + (g.totalMarks || 0), 0);
+  const avgMPR = totalThrows > 0 ? ((totalMarks / totalThrows) * 3).toFixed(2) : '0.00';
   const avgThrows = total > 0 ? (totalThrows / total).toFixed(1) : 0;
   const bestGame = total > 0 ? Math.min(...games.map(g => g.throws)) : 0;
   

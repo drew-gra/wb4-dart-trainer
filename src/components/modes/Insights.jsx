@@ -88,20 +88,26 @@ const calculateTrending = (sessions) => {
     };
   }
 
-  // MPR trending (Triples + Cricket)
+  // MPR trending (Triples + Cricket), weighted by session length
   const allMPR = sessions
-    .filter(s => (s.mode === 'triples' && s.avgRounds) || (s.mode === 'cricket' && s.mpr))
+    .filter(s => (s.mode === 'triples' && s.totalAttempts > 0) || (s.mode === 'cricket' && s.throws > 0))
     .sort((a, b) => new Date(b.endTime) - new Date(a.endTime))
     .map(s => ({
-      ...s,
-      mprValue: s.mode === 'cricket' ? s.mpr : parseFloat(s.avgRounds),
+      marks:  s.mode === 'cricket' ? (s.totalMarks || 21) : s.totalRounds,
+      rounds: s.mode === 'cricket' ? s.throws / 3 : s.totalAttempts,
     }));
 
   let trendMPR = null;
   if (allMPR.length >= MIN_SESSIONS) {
     const recent = allMPR.slice(0, WINDOW);
-    const recentAvg = recent.reduce((sum, s) => sum + s.mprValue, 0) / recent.length;
-    const overallAvg = allMPR.reduce((sum, s) => sum + s.mprValue, 0) / allMPR.length;
+    const recentMarks  = recent.reduce((sum, s) => sum + s.marks, 0);
+    const recentRounds = recent.reduce((sum, s) => sum + s.rounds, 0);
+    const recentAvg = recentRounds > 0 ? recentMarks / recentRounds : 0;
+
+    const overallMarks  = allMPR.reduce((sum, s) => sum + s.marks, 0);
+    const overallRounds = allMPR.reduce((sum, s) => sum + s.rounds, 0);
+    const overallAvg = overallRounds > 0 ? overallMarks / overallRounds : 0;
+
     const delta = recentAvg - overallAvg;
     trendMPR = {
       recent: recentAvg.toFixed(2),

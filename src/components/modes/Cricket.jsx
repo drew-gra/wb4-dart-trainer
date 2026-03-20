@@ -30,12 +30,13 @@ export const Cricket = () => {
   const soloSessions = useSessionStore(state => state.soloSessions);
   const showStatus = useAppStore(state => state.showStatus);
 
-  // Calculate consolidated MPR from all saved cricket sessions
+  // Calculate consolidated MPR from all saved cricket sessions (weighted by session length)
   const consolidatedMPR = useMemo(() => {
-    const cricketSessions = soloSessions.filter(s => s.mode === 'cricket' && s.mpr);
+    const cricketSessions = soloSessions.filter(s => s.mode === 'cricket' && s.throws > 0);
     if (cricketSessions.length === 0) return null;
-    const avg = cricketSessions.reduce((sum, s) => sum + s.mpr, 0) / cricketSessions.length;
-    return avg.toFixed(2);
+    const totalMarks = cricketSessions.reduce((sum, s) => sum + (s.totalMarks || 21), 0);
+    const totalRounds = cricketSessions.reduce((sum, s) => sum + (s.throws / 3), 0);
+    return totalRounds > 0 ? (totalMarks / totalRounds).toFixed(2) : null;
   }, [soloSessions]);
 
   // Load in-progress game on mount
