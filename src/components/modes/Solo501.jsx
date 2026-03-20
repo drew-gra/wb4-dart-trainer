@@ -56,12 +56,12 @@ export const Solo501 = () => {
   // Compute dynamic hot row scores from session history
   const hotRowScores = useMemo(() => getHotRowScores(allSessions), [allSessions]);
 
-  // Calculate consolidated 3DA from all saved solo-501 sessions
+  // Calculate consolidated 3DA from all saved solo-501 sessions (weighted by darts thrown)
   const consolidated3DA = useMemo(() => {
-    const solo501Sessions = soloSessions.filter(s => s.mode === 'solo-501' && s.avg3DA);
+    const solo501Sessions = soloSessions.filter(s => s.mode === 'solo-501' && s.darts > 0);
     if (solo501Sessions.length === 0) return null;
-    const avg = solo501Sessions.reduce((sum, s) => sum + s.avg3DA, 0) / solo501Sessions.length;
-    return avg.toFixed(1);
+    const totalDarts = solo501Sessions.reduce((sum, s) => sum + s.darts, 0);
+    return ((501 * solo501Sessions.length / totalDarts) * 3).toFixed(1);
   }, [soloSessions]);
 
   // Load in-progress game on mount

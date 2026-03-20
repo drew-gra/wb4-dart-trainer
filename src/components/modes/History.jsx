@@ -98,12 +98,11 @@ const calculateUnifiedMetrics = (sessions) => {
   const coSuccesses = doSuccesses + s501Successes;
   const checkoutPct = coTotal > 0 ? Math.round((coSuccesses / coTotal) * 100) : '-';
 
-  // Unified 3DA (from Solo 501 + First 9)
-  const solo501Sessions = sessions.filter(s => s.mode === 'solo-501' && s.avg3DA);
-  const first9Sessions = sessions.filter(s => s.mode === 'first-9' && s.avg3DA);
-  const all3DASessions = [...solo501Sessions, ...first9Sessions];
-  const unified3DA = all3DASessions.length > 0
-    ? (all3DASessions.reduce((sum, s) => sum + s.avg3DA, 0) / all3DASessions.length).toFixed(1)
+  // 3DA: Solo 501 only, weighted by darts thrown
+  const solo501Sessions = sessions.filter(s => s.mode === 'solo-501' && s.darts > 0);
+  const s501TotalDarts = solo501Sessions.reduce((sum, s) => sum + s.darts, 0);
+  const unified3DA = s501TotalDarts > 0
+    ? ((501 * solo501Sessions.length / s501TotalDarts) * 3).toFixed(1)
     : '-';
 
   // Unified MPR (from Trips + Cricket)

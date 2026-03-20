@@ -44,11 +44,11 @@ const calculateUnifiedMetrics = (sessions) => {
   const coSuccesses = doSuccesses + s501Successes;
   const checkoutPct = coTotal > 0 ? Math.round((coSuccesses / coTotal) * 100) : '-';
 
-  const solo501Sessions = sessions.filter(s => s.mode === 'solo-501' && s.avg3DA);
-  const first9Sessions = sessions.filter(s => s.mode === 'first-9' && s.avg3DA);
-  const all3DASessions = [...solo501Sessions, ...first9Sessions];
-  const unified3DA = all3DASessions.length > 0
-    ? (all3DASessions.reduce((sum, s) => sum + s.avg3DA, 0) / all3DASessions.length).toFixed(1)
+  // 3DA: Solo 501 only, weighted by darts thrown
+  const solo501Sessions = sessions.filter(s => s.mode === 'solo-501' && s.darts > 0);
+  const s501TotalDarts = solo501Sessions.reduce((sum, s) => sum + s.darts, 0);
+  const unified3DA = s501TotalDarts > 0
+    ? ((501 * solo501Sessions.length / s501TotalDarts) * 3).toFixed(1)
     : '-';
 
   const tripsSessions = sessions.filter(s => s.mode === 'triples');
@@ -69,16 +69,20 @@ const calculateTrending = (sessions) => {
   const WINDOW = 10;
   const MIN_SESSIONS = 50;
 
-  // 3DA trending (Solo 501 + First 9)
+  // 3DA trending: Solo 501 only, weighted by darts thrown
   const all3DA = sessions
-    .filter(s => (s.mode === 'solo-501' || s.mode === 'first-9') && s.avg3DA)
+    .filter(s => s.mode === 'solo-501' && s.darts > 0)
     .sort((a, b) => new Date(b.endTime) - new Date(a.endTime));
 
   let trend3DA = null;
   if (all3DA.length >= MIN_SESSIONS) {
     const recent = all3DA.slice(0, WINDOW);
-    const recentAvg = recent.reduce((sum, s) => sum + s.avg3DA, 0) / recent.length;
-    const overallAvg = all3DA.reduce((sum, s) => sum + s.avg3DA, 0) / all3DA.length;
+    const recentDarts = recent.reduce((sum, s) => sum + s.darts, 0);
+    const recentAvg = (501 * recent.length / recentDarts) * 3;
+
+    const overallDarts = all3DA.reduce((sum, s) => sum + s.darts, 0);
+    const overallAvg = (501 * all3DA.length / overallDarts) * 3;
+
     const delta = recentAvg - overallAvg;
     trend3DA = {
       recent: recentAvg.toFixed(1),
