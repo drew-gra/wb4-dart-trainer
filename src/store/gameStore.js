@@ -82,11 +82,17 @@ export const useSessionStore = create((set, get) => ({
     });
   },
   
-  // Clear all sessions
+  // Clear all sessions (including any in-progress state saved by individual modes)
   clearSessions: () => {
     localStorage.removeItem(REPS_KEY);
     localStorage.removeItem(SOLO_KEY);
-    localStorage.removeItem(LEGACY_KEY); // clean up if somehow still present
+    localStorage.removeItem(LEGACY_KEY);
+    localStorage.removeItem('wb4_inprogress_cricket');
+    localStorage.removeItem('wb4_inprogress_solo501');
+    localStorage.removeItem('wb4_inprogress_first9');
+    localStorage.removeItem('wb4_inprogress_triples');
+    localStorage.removeItem('wb4_inprogress_double_in');
+    localStorage.removeItem('wb4_inprogress_double_out');
     set({ repsSessions: [], soloSessions: [] });
   },
   

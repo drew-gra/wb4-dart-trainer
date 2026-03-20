@@ -21,23 +21,22 @@ export const Cricket = () => {
   const [score, setScore] = useState(0);
   const [totalMarks, setTotalMarks] = useState(0);
   const [gameStart, setGameStart] = useState(null);
-  const [completedGames, setCompletedGames] = useState([]);
   const [pendingSelections, setPendingSelections] = useState([]);
   const [targetData, setTargetData] = useState({});
   const [showSavedOverlay, setShowSavedOverlay] = useState(false);
-  
+
   const addSession = useSessionStore(state => state.addSession);
   const soloSessions = useSessionStore(state => state.soloSessions);
   const showStatus = useAppStore(state => state.showStatus);
 
-  // Calculate consolidated MPR from all saved cricket sessions (weighted by session length)
-  const consolidatedMPR = useMemo(() => {
-    const cricketSessions = soloSessions.filter(s => s.mode === 'cricket' && s.throws > 0);
-    if (cricketSessions.length === 0) return null;
-    const totalMarks = cricketSessions.reduce((sum, s) => sum + (s.totalMarks || 21), 0);
-    const totalRounds = cricketSessions.reduce((sum, s) => sum + (s.throws / 3), 0);
-    return totalRounds > 0 ? (totalMarks / totalRounds).toFixed(2) : null;
-  }, [soloSessions]);
+  // Single source of truth: cricket sessions from the store
+  const cricketSessions = useMemo(() =>
+    soloSessions.filter(s => s.mode === 'cricket'),
+    [soloSessions]
+  );
+
+  const stats = useMemo(() => calculateCricketStats(cricketSessions), [cricketSessions]);
+  const consolidatedMPR = cricketSessions.length > 0 ? stats.avgMPR : null;
 
   // Load in-progress game on mount
   useEffect(() => {
@@ -51,7 +50,6 @@ export const Cricket = () => {
         setScore(data.score || 0);
         setTotalMarks(data.totalMarks || 0);
         setGameStart(data.gameStart ? new Date(data.gameStart) : null);
-        setCompletedGames(data.completedGames || []);
         setTargetData(data.targetData || {});
       }
     } catch (e) {
@@ -61,7 +59,7 @@ export const Cricket = () => {
 
   // Save in-progress game whenever state changes
   useEffect(() => {
-    if (totalThrows > 0 || completedGames.length > 0) {
+    if (totalThrows > 0) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         hits,
         totalThrows,
@@ -69,11 +67,10 @@ export const Cricket = () => {
         score,
         totalMarks,
         gameStart: gameStart?.toISOString(),
-        completedGames,
         targetData
       }));
     }
-  }, [hits, totalThrows, missCount, score, totalMarks, gameStart, completedGames, targetData]);
+  }, [hits, totalThrows, missCount, score, totalMarks, gameStart, targetData]);
 
   // Calculate closing marks (capped at 3 per number)
   const closingMarks = Object.values(hits).reduce((sum, count) => sum + Math.min(count, 3), 0);
@@ -95,18 +92,6 @@ export const Cricket = () => {
       const now = new Date();
       const residualMarks = totalMarks - TOTAL_MARKS_TO_CLOSE;
       const mpr = (totalMarks / totalThrows) * 3;
-      
-      const game = {
-        throws: totalThrows,
-        score,
-        totalMarks,
-        residualMarks,
-        mpr: parseFloat(mpr.toFixed(2)),
-        timestamp: now.toLocaleTimeString(),
-        date: now.toLocaleDateString()
-      };
-      
-      setCompletedGames(prev => [game, ...prev]);
       
       const duration = Math.round((now - gameStart) / 60000) || 1;
       const missRate = totalThrows > 0 ? Math.round((missCount / totalThrows) * 100) : 0;
@@ -252,19 +237,13 @@ export const Cricket = () => {
     setGameStart(null);
     setPendingSelections([]);
     setTargetData({});
-    if (completedGames.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ completedGames }));
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
+    localStorage.removeItem(STORAGE_KEY);
     showStatus('🎯 New game started', 1000);
   };
 
   const isPending = (number, count) => pendingSelections.some(s => s.type === 'hit' && s.number === number && s.marksThrown === count);
   const isMissPending = pendingSelections.some(s => s.type === 'miss');
   const isLocked = pendingSelections.length >= 3;
-
-  const stats = calculateCricketStats(completedGames);
 
   // Find the first open number for miss/submit placement
   const priorityOrder = [20, 19, 18, 17, 16, 15, 'Bull'];
@@ -429,13 +408,13 @@ export const Cricket = () => {
         <StatItem value={stats.avgMPR || '-'} label="AVG MPR" useGradient />
       </StatsCard>
 
-      <RecentList 
+      <RecentList
         title="🎯 RECENT GAMES"
-        items={completedGames}
+        items={cricketSessions}
         renderItem={(game, i) => (
           <>
-            <span className="text-yellow-400 font-semibold">Game #{completedGames.length - i}</span>
-            <span className="text-white font-semibold">{game.mpr || (63 / game.throws).toFixed(2)} MPR</span>
+            <span className="text-yellow-400 font-semibold">Game #{cricketSessions.length - i}</span>
+            <span className="text-white font-semibold">{game.mpr} MPR</span>
             <span className="text-green-400 font-semibold">{game.score || 0} pts</span>
           </>
         )}
