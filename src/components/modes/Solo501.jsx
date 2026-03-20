@@ -35,7 +35,6 @@ export const Solo501 = () => {
   const [remaining, setRemaining] = useState(501);
   const [turnHistory, setTurnHistory] = useState([]);
   const [gameStart, setGameStart] = useState(null);
-  const [completedGames, setCompletedGames] = useState([]);
   const [showScoreInput, setShowScoreInput] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [pendingCheckout, setPendingCheckout] = useState(null);
@@ -73,7 +72,6 @@ export const Solo501 = () => {
         setRemaining(data.remaining || 501);
         setTurnHistory(data.turnHistory || []);
         setGameStart(data.gameStart ? new Date(data.gameStart) : null);
-        setCompletedGames(data.completedGames || []);
         setCheckoutAttempts(data.checkoutAttempts || 0);
         setCheckoutSuccesses(data.checkoutSuccesses || 0);
       }
@@ -84,17 +82,16 @@ export const Solo501 = () => {
 
   // Save in-progress game whenever state changes
   useEffect(() => {
-    if (turnHistory.length > 0 || completedGames.length > 0) {
+    if (turnHistory.length > 0) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         remaining,
         turnHistory,
         gameStart: gameStart?.toISOString(),
-        completedGames,
         checkoutAttempts,
         checkoutSuccesses
       }));
     }
-  }, [remaining, turnHistory, gameStart, completedGames, checkoutAttempts, checkoutSuccesses]);
+  }, [remaining, turnHistory, gameStart, checkoutAttempts, checkoutSuccesses]);
 
   // Helper to check if current remaining is a checkout attempt
   const isCheckoutAttemptScore = (score) => {
@@ -168,15 +165,6 @@ export const Solo501 = () => {
     const totalDarts = previousDarts + darts;
     const totalTurns = turnHistory.length + 1;
     const avg3DA = (501 / totalDarts) * 3;
-
-    const game = {
-      darts: totalDarts,
-      turns: totalTurns,
-      avg3DA: parseFloat(avg3DA.toFixed(1)),
-      timestamp: new Date().toLocaleTimeString()
-    };
-
-    setCompletedGames(prev => [game, ...prev]);
 
     // Auto-save session when game completes
     const now = new Date();
@@ -284,11 +272,7 @@ export const Solo501 = () => {
     setCheckoutAttempts(0);
     setCheckoutSuccesses(0);
     
-    if (completedGames.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ completedGames }));
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
+    localStorage.removeItem(STORAGE_KEY);
     showStatus('🎯 New game started', 1000);
   };
 
@@ -296,8 +280,13 @@ export const Solo501 = () => {
     ? ((501 - remaining) / turnHistory.length).toFixed(1)
     : '—';
 
-  const avgDarts = completedGames.length > 0
-    ? (completedGames.reduce((sum, g) => sum + g.darts, 0) / completedGames.length).toFixed(1)
+  const solo501Sessions = useMemo(() =>
+    soloSessions.filter(s => s.mode === 'solo-501'),
+    [soloSessions]
+  );
+
+  const avgDarts = solo501Sessions.length > 0
+    ? (solo501Sessions.reduce((sum, s) => sum + s.darts, 0) / solo501Sessions.length).toFixed(1)
     : '0';
 
   const isCheckoutRange = remaining <= 170 && isValidCheckout(remaining);
@@ -390,7 +379,7 @@ export const Solo501 = () => {
 
       {/* Stats Section */}
       <StatsCard title="📊 STATS">
-        <StatItem value={completedGames.length} label="GAMES" color="yellow" />
+        <StatItem value={solo501Sessions.length} label="GAMES" color="yellow" />
         <StatItem value={avgDarts} label="AVG DARTS" useGradient />
       </StatsCard>
 
@@ -411,13 +400,13 @@ export const Solo501 = () => {
       )}
 
       {/* Completed Games */}
-      {completedGames.length > 0 && (
+      {solo501Sessions.length > 0 && (
         <RecentList
           title="🏆 COMPLETED GAMES"
-          items={completedGames}
+          items={solo501Sessions}
           renderItem={(game, i) => (
             <>
-              <span className="text-yellow-400 font-semibold">Game #{completedGames.length - i}</span>
+              <span className="text-yellow-400 font-semibold">Game #{solo501Sessions.length - i}</span>
               <span className="text-white font-semibold">{game.darts} darts</span>
               <span className="text-green-400 font-semibold">{game.avg3DA} 3DA</span>
             </>
