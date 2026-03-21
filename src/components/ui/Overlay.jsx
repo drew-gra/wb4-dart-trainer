@@ -82,9 +82,9 @@ export const CheckoutOverlay = ({ isOpen, onSelect, minDarts = 1 }) => (
 /**
  * Name Prompt Overlay - shown on first share if no name is set
  */
-export const NamePromptOverlay = ({ isOpen, onSubmit, onSkip }) => {
-  const [nameVal, setNameVal] = useState('');
-  const [teamVal, setTeamVal] = useState('');
+export const NamePromptOverlay = ({ isOpen, onSubmit, onSkip, initialName = '', initialTeam = '' }) => {
+  const [nameVal, setNameVal] = useState(initialName);
+  const [teamVal, setTeamVal] = useState(initialTeam);
 
   if (!isOpen) return null;
 

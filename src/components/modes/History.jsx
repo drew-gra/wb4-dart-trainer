@@ -172,6 +172,7 @@ export const History = ({ onBack }) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [confirmStep, setConfirmStep] = useState(false);
   const [namePromptOpen, setNamePromptOpen] = useState(false);
+  const [profileEditOpen, setProfileEditOpen] = useState(false);
   const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
   const settingsRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -225,6 +226,12 @@ export const History = ({ onBack }) => {
     declineName();
     setNamePromptOpen(false);
     setSharePreviewOpen(true);
+  };
+
+  const handleProfileEditSubmit = (name, team) => {
+    setPlayerInfo(name, team || null);
+    setProfileEditOpen(false);
+    showStatus('✅ Profile saved', 1500);
   };
 
   const handleClearAll = () => {
@@ -316,8 +323,14 @@ export const History = ({ onBack }) => {
               {!confirmStep ? (
                 <div>
                   <button
-                    onClick={handleExport}
+                    onClick={() => { setProfileEditOpen(true); setSettingsOpen(false); }}
                     className="w-full text-left px-4 py-3 text-gray-300 text-sm font-semibold hover:bg-gray-800 rounded-t-lg transition-colors"
+                  >
+                    {playerName ? `Edit profile · ${playerName}` : 'Set your name & team'}
+                  </button>
+                  <button
+                    onClick={handleExport}
+                    className="w-full text-left px-4 py-3 text-gray-300 text-sm font-semibold hover:bg-gray-800 transition-colors border-t border-gray-800"
                   >
                     Export data
                   </button>
@@ -482,6 +495,15 @@ export const History = ({ onBack }) => {
         isOpen={namePromptOpen}
         onSubmit={handleNameSubmit}
         onSkip={handleNameSkip}
+      />
+
+      {/* Profile edit from settings */}
+      <NamePromptOverlay
+        isOpen={profileEditOpen}
+        onSubmit={handleProfileEditSubmit}
+        onSkip={() => setProfileEditOpen(false)}
+        initialName={playerName || ''}
+        initialTeam={playerTeam || ''}
       />
 
       <SharePreviewOverlay
