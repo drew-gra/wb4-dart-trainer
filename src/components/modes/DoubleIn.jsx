@@ -4,6 +4,7 @@ import { calculateStats } from '../../utils/statistics';
 import { trackEvent } from '../../utils/analytics';
 import { getHotRowScores } from '../../utils/hotrow';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
+import { SessionSavedOverlay } from '../ui/Overlay';
 import { ScoreInput } from '../ui/ScoreInput';
 import { HotRow } from '../ui/HotRow';
 import { GOLD_GRADIENT } from '../../utils/constants';
@@ -14,6 +15,7 @@ export const DoubleIn = () => {
   const [attempts, setAttempts] = useState([]);
   const [sessionStart, setSessionStart] = useState(null);
   const [showScoreInput, setShowScoreInput] = useState(false);
+  const [showSavedOverlay, setShowSavedOverlay] = useState(false);
   
   const addSession = useSessionStore(state => state.addSession);
   const repsSessions = useSessionStore(state => state.repsSessions);
@@ -122,11 +124,16 @@ export const DoubleIn = () => {
     localStorage.removeItem(STORAGE_KEY);
     setAttempts([]);
     setSessionStart(null);
-    showStatus('📊 Session saved', 1500);
+    setShowSavedOverlay(true);
   };
 
   return (
     <>
+      <SessionSavedOverlay
+        isOpen={showSavedOverlay}
+        onContinue={() => setShowSavedOverlay(false)}
+      />
+
       {/* Header - shows last outcome */}
       <div className="text-center mb-8">
         {attempts.length === 0 ? (

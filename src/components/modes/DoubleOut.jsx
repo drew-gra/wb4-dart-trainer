@@ -5,6 +5,7 @@ import { generateDoubleOutTarget } from '../../utils/targeting';
 import { trackEvent } from '../../utils/analytics';
 import { ActionButton } from '../ui/Button';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
+import { SessionSavedOverlay } from '../ui/Overlay';
 import { GOLD_GRADIENT } from '../../utils/constants';
 
 const STORAGE_KEY = 'wb4_inprogress_double_out';
@@ -14,6 +15,7 @@ export const DoubleOut = () => {
   const [sessionStart, setSessionStart] = useState(null);
   const [currentTarget, setCurrentTarget] = useState(null);
   const [consecutiveFails, setConsecutiveFails] = useState(0);
+  const [showSavedOverlay, setShowSavedOverlay] = useState(false);
   
   const addSession = useSessionStore(state => state.addSession);
   const showStatus = useAppStore(state => state.showStatus);
@@ -106,7 +108,7 @@ export const DoubleOut = () => {
     setSessionStart(null);
     setConsecutiveFails(0);
     setCurrentTarget(generateDoubleOutTarget(0));
-    showStatus('📊 Session saved', 1500);
+    setShowSavedOverlay(true);
   };
 
   // Format display: DB shows as "DB", numbers show as "D16" etc
@@ -114,6 +116,11 @@ export const DoubleOut = () => {
 
   return (
     <>
+      <SessionSavedOverlay
+        isOpen={showSavedOverlay}
+        onContinue={() => setShowSavedOverlay(false)}
+      />
+
       {/* Target Display - no box */}
       <div className="text-center mb-8">
         <div className="text-6xl font-black mb-4" style={GOLD_GRADIENT}>

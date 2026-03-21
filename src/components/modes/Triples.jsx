@@ -5,6 +5,7 @@ import { generateTriplesTarget } from '../../utils/targeting';
 import { trackEvent } from '../../utils/analytics';
 import { Button } from '../ui/Button';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
+import { SessionSavedOverlay } from '../ui/Overlay';
 import { GOLD_GRADIENT } from '../../utils/constants';
 
 const STORAGE_KEY = 'wb4_inprogress_triples';
@@ -13,6 +14,7 @@ export const Triples = () => {
   const [attempts, setAttempts] = useState([]);
   const [sessionStart, setSessionStart] = useState(null);
   const [currentTarget, setCurrentTarget] = useState(null);
+  const [showSavedOverlay, setShowSavedOverlay] = useState(false);
   
   const addSession = useSessionStore(state => state.addSession);
   const showStatus = useAppStore(state => state.showStatus);
@@ -94,13 +96,18 @@ export const Triples = () => {
     setAttempts([]);
     setSessionStart(null);
     setCurrentTarget(generateTriplesTarget());
-    showStatus('📊 Session saved', 1500);
+    setShowSavedOverlay(true);
   };
 
   const isBull = currentTarget === 'Bull';
 
   return (
     <>
+      <SessionSavedOverlay
+        isOpen={showSavedOverlay}
+        onContinue={() => setShowSavedOverlay(false)}
+      />
+
       {/* Target Display - no box */}
       <div className="text-center mb-8">
         <div className="text-6xl font-black mb-4" style={GOLD_GRADIENT}>
