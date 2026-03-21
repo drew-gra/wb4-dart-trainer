@@ -9,8 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "html-to-image": "^1.11.13",
-    "posthog-js": "^1.335.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "zustand": "^4.4.0"

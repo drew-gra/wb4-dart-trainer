@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { useSessionStore, useAppStore } from './store/gameStore';
 import { trackEvent } from './utils/analytics';
 import { REPS_MODES, SOLO_MODES } from './utils/constants';
@@ -147,6 +148,7 @@ const App = () => {
           <p>All rights reserved.</p>
         </div>
       </div>
+      <Analytics />
     </div>
   );
 };
