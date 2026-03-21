@@ -113,6 +113,7 @@ export const Cricket = () => {
       });
       
       // Reset game state
+      localStorage.removeItem(STORAGE_KEY);
       setHits({ 20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, Bull: 0 });
       setTotalThrows(0);
       setMissCount(0);

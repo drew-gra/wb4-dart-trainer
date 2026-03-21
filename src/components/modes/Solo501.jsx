@@ -207,6 +207,7 @@ export const Solo501 = () => {
     });
 
     // Reset for new game
+    localStorage.removeItem(STORAGE_KEY);
     setRemaining(501);
     setTurnHistory([]);
     setGameStart(null);
