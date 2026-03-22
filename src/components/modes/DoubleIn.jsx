@@ -180,10 +180,10 @@ export const DoubleIn = () => {
           disabled={attempts.length === 0}
           className={`w-full py-4 rounded-lg font-black text-lg transition-all border-2 shadow-lg ${
             attempts.length === 0
-              ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
-              : 'text-black border-yellow-400 transform hover:scale-105'
+              ? 'bg-[#252a3a] text-gray-600 border-[#2a2f42] cursor-not-allowed'
+              : 'text-black border-amber-400 transform hover:scale-105'
           }`}
-          style={attempts.length > 0 ? { background: 'linear-gradient(45deg, #ffd700, #ffed4a)' } : {}}
+          style={attempts.length > 0 ? { background: 'linear-gradient(135deg, #f59e0b, #fcd34d)' } : {}}
         >
           💾 SAVE SESSION
         </button>

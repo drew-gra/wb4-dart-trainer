@@ -26,7 +26,7 @@ const ShareIcon = ({ size = 14 }) => (
 export const ShareButton = ({ onClick }) => (
   <button
     onClick={onClick}
-    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-700 bg-gray-800 text-gray-400 text-xs font-semibold hover:text-gray-300 hover:bg-gray-700 transition-all"
+    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[#2a2f42] bg-[#252a3a] text-slate-400 text-xs font-semibold hover:text-gray-300 hover:bg-[#2a2f42] transition-all"
   >
     <ShareIcon size={14} />
     Share
@@ -221,7 +221,7 @@ export const SharePreviewOverlay = ({ isOpen, onClose, metrics, playerName, play
     <div className="fixed inset-0 bg-black bg-opacity-85 flex flex-col items-center justify-center z-50 p-6">
       {/* Scaled preview */}
       <div
-        className="rounded-xl overflow-hidden shadow-2xl border border-gray-800 mb-5"
+        className="rounded-xl overflow-hidden shadow-2xl border border-[#2a2f42] mb-5"
         style={{ width: '340px', height: '340px' }}
       >
         <div
@@ -246,13 +246,13 @@ export const SharePreviewOverlay = ({ isOpen, onClose, metrics, playerName, play
       <div className="flex gap-3" style={{ width: '340px' }}>
         <button
           onClick={handleExport}
-          className="flex-1 py-3.5 rounded-lg font-bold text-base border-2 border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:bg-opacity-10 transition-all"
+          className="flex-1 py-3.5 rounded-lg font-bold text-base border-2 border-amber-500 text-yellow-500 hover:bg-yellow-500 hover:bg-opacity-10 transition-all"
         >
           {navigator.canShare ? 'Share' : 'Save Image'}
         </button>
         <button
           onClick={onClose}
-          className="px-5 py-3.5 rounded-lg font-semibold text-base border border-gray-700 bg-gray-800 text-gray-400 hover:bg-gray-700 transition-all"
+          className="px-5 py-3.5 rounded-lg font-semibold text-base border border-[#2a2f42] bg-[#252a3a] text-slate-400 hover:bg-[#2a2f42] transition-all"
         >
           Close
         </button>

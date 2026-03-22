@@ -201,10 +201,10 @@ export const First9 = () => {
             {currentInstanceScore}
           </div>
           <div className="text-left">
-            <div className="text-gray-400 text-xs">
+            <div className="text-slate-400 text-xs">
               Turn: <span className="text-white font-semibold">{currentInstanceTurns + 1} of 3</span>
             </div>
-            <div className="text-gray-400 text-xs">
+            <div className="text-slate-400 text-xs">
               3DA: <span className="text-white font-semibold">{currentInstance3DA}</span>
             </div>
           </div>
@@ -236,7 +236,7 @@ export const First9 = () => {
           <div className="mt-4 text-center text-sm">
             {currentInstanceScores.map((score, i) => (
               <span key={i}>
-                <span className="text-gray-400">{score}</span>
+                <span className="text-slate-400">{score}</span>
                 {i < currentInstanceScores.length - 1 && <span className="text-gray-700"> → </span>}
               </span>
             ))}
@@ -251,10 +251,10 @@ export const First9 = () => {
           disabled={completedInstances.length === 0}
           className={`w-full py-4 rounded-lg font-black text-lg transition-all border-2 shadow-lg ${
             completedInstances.length === 0
-              ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
-              : 'text-black border-yellow-400 transform hover:scale-105'
+              ? 'bg-[#252a3a] text-gray-600 border-[#2a2f42] cursor-not-allowed'
+              : 'text-black border-amber-400 transform hover:scale-105'
           }`}
-          style={completedInstances.length > 0 ? { background: 'linear-gradient(45deg, #ffd700, #ffed4a)' } : {}}
+          style={completedInstances.length > 0 ? { background: 'linear-gradient(135deg, #f59e0b, #fcd34d)' } : {}}
         >
           💾 SAVE SESSION
         </button>

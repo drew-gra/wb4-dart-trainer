@@ -37,7 +37,7 @@ const MainMenu = ({ onModeChange }) => {
               style={GOLD_GRADIENT}
             >
               {category.label}
-              {category.comingSoon && <span className="text-sm font-normal text-gray-400 ml-2">(Coming soon)</span>}
+              {category.comingSoon && <span className="text-sm font-normal text-slate-400 ml-2">(Coming soon)</span>}
             </div>
           </button>
         ))}
@@ -55,7 +55,7 @@ const MainMenu = ({ onModeChange }) => {
           </div>
 
           {aboutOpen && (
-            <div className="bg-gray-900 rounded-lg border border-gray-800 p-5">
+            <div className="bg-[#1c1f2e] rounded-lg border border-[#2a2f42] p-5">
               <div className="text-sm text-gray-300 leading-relaxed space-y-4">
                 <p>
                   This is a free darts practice app for solo play. It saves and provides analytics on your last 200 solo practice sessions across six modes:

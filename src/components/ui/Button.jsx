@@ -18,8 +18,8 @@ export const Button = ({
     default: "text-white border-gray-600 hover:scale-105",
     success: "bg-green-600 text-white border-green-400 hover:scale-105",
     danger: "bg-red-600 text-white border-red-500 hover:scale-105",
-    gold: "text-black border-yellow-400",
-    ghost: "bg-transparent text-gray-400 border-gray-700 hover:text-gray-200"
+    gold: "text-black border-amber-400",
+    ghost: "bg-transparent text-slate-400 border-[#2a2f42] hover:text-gray-200"
   };
   
   const sizes = {
@@ -35,7 +35,7 @@ export const Button = ({
   const bgStyle = variant === 'default' || variant === 'ghost'
     ? { background: 'linear-gradient(145deg, #374151, #1f2937)' }
     : variant === 'gold'
-    ? { background: 'linear-gradient(45deg, #ffd700, #ffed4a)' }
+    ? { background: 'linear-gradient(135deg, #f59e0b, #fcd34d)' }
     : {};
 
   return (

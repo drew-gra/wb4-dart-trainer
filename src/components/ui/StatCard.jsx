@@ -32,7 +32,7 @@ export const StatItem = ({ value, label, color = 'yellow', useGradient = false }
  * Stats container card
  */
 export const StatsCard = ({ title, children }) => (
-  <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+  <div className="bg-[#1c1f2e] rounded-lg p-4 mb-8 border border-[#2a2f42]">
     <h3 className="text-lg font-bold mb-3 text-pink-400">{title}</h3>
     <div className="grid grid-cols-2 gap-4">
       {children}
@@ -47,11 +47,11 @@ export const RecentList = ({ title, items, renderItem }) => {
   if (!items || items.length === 0) return null;
   
   return (
-    <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+    <div className="bg-[#1c1f2e] rounded-lg p-4 mb-8 border border-[#2a2f42]">
       <h3 className="text-lg font-bold mb-3 text-pink-400">{title}</h3>
       <div className="space-y-2 max-h-40 overflow-y-auto">
         {items.slice(0, 10).map((item, i) => (
-          <div key={i} className="flex justify-between items-center text-sm bg-gray-800 p-2 rounded">
+          <div key={i} className="flex justify-between items-center text-sm bg-[#252a3a] p-2 rounded">
             {renderItem(item, i)}
           </div>
         ))}

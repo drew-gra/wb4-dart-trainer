@@ -155,7 +155,7 @@ const SessionRow = ({ s }) => {
   else statStr = `${s.successRate}%`;
   
   return (
-    <div className="flex items-center justify-between py-2 border-b border-gray-800">
+    <div className="flex items-center justify-between py-2 border-b border-[#2a2f42]">
       <div className="flex items-center gap-3">
         <div className={`w-2 h-2 rounded-full ${modeColors[s.mode]}`}></div>
         <span className="text-gray-300 text-sm">{modeLabels[s.mode]}</span>
@@ -309,7 +309,7 @@ export const History = ({ onBack }) => {
               setConfirmStep(false);
             }}
             className={`p-2 rounded-lg transition-all ${
-              settingsOpen ? 'text-pink-400 bg-gray-800' : 'text-gray-500 hover:text-gray-300'
+              settingsOpen ? 'text-pink-400 bg-[#252a3a]' : 'text-gray-500 hover:text-gray-300'
             }`}
           >
             <GearIcon size={22} />
@@ -317,32 +317,32 @@ export const History = ({ onBack }) => {
 
           {/* Settings Dropdown */}
           {settingsOpen && (
-            <div className="absolute right-0 top-full mt-2 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50"
+            <div className="absolute right-0 top-full mt-2 bg-[#1c1f2e] border border-[#2a2f42] rounded-lg shadow-2xl z-50"
               style={{ minWidth: '200px' }}
             >
               {!confirmStep ? (
                 <div>
                   <button
                     onClick={() => { setProfileEditOpen(true); setSettingsOpen(false); }}
-                    className="w-full text-left px-4 py-3 text-gray-300 text-sm font-semibold hover:bg-gray-800 rounded-t-lg transition-colors"
+                    className="w-full text-left px-4 py-3 text-gray-300 text-sm font-semibold hover:bg-[#252a3a] rounded-t-lg transition-colors"
                   >
                     {playerName ? `Edit profile · ${playerName}` : 'Set your name & team'}
                   </button>
                   <button
                     onClick={handleExport}
-                    className="w-full text-left px-4 py-3 text-gray-300 text-sm font-semibold hover:bg-gray-800 transition-colors border-t border-gray-800"
+                    className="w-full text-left px-4 py-3 text-gray-300 text-sm font-semibold hover:bg-[#252a3a] transition-colors border-t border-[#2a2f42]"
                   >
                     Export data
                   </button>
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full text-left px-4 py-3 text-gray-300 text-sm font-semibold hover:bg-gray-800 transition-colors"
+                    className="w-full text-left px-4 py-3 text-gray-300 text-sm font-semibold hover:bg-[#252a3a] transition-colors"
                   >
                     Import data
                   </button>
                   <button
                     onClick={() => setConfirmStep(true)}
-                    className="w-full text-left px-4 py-3 text-red-400 text-sm font-semibold hover:bg-gray-800 rounded-b-lg transition-colors border-t border-gray-800"
+                    className="w-full text-left px-4 py-3 text-red-400 text-sm font-semibold hover:bg-[#252a3a] rounded-b-lg transition-colors border-t border-[#2a2f42]"
                   >
                     Clear all data
                   </button>
@@ -359,7 +359,7 @@ export const History = ({ onBack }) => {
                     </button>
                     <button
                       onClick={() => setConfirmStep(false)}
-                      className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm font-semibold py-2 rounded-md transition-colors"
+                      className="flex-1 bg-[#2a2f42] hover:bg-[#323850] text-gray-300 text-sm font-semibold py-2 rounded-md transition-colors"
                     >
                       Cancel
                     </button>
@@ -373,7 +373,7 @@ export const History = ({ onBack }) => {
       </div>
 
       {/* Session Counts */}
-      <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
+      <div className="bg-[#1c1f2e] rounded-lg p-4 mb-6 border border-[#2a2f42]">
         <div className="flex items-baseline justify-between mb-3">
           <h3 className="text-lg font-bold text-pink-400">SESSIONS</h3>
           <span className="text-xs text-gray-500">{totalDarts.toLocaleString()} darts</span>
@@ -383,43 +383,43 @@ export const History = ({ onBack }) => {
             <div className="text-xl font-bold text-blue-400">
               {sessionCounts['double-in']}
             </div>
-            <div className="text-xs text-gray-400">DI</div>
+            <div className="text-xs text-slate-400">DI</div>
           </div>
           <div>
             <div className="text-xl font-bold text-green-400">
               {sessionCounts['double-out']}
             </div>
-            <div className="text-xs text-gray-400">DO</div>
+            <div className="text-xs text-slate-400">DO</div>
           </div>
           <div>
             <div className="text-xl font-bold text-purple-400">
               {sessionCounts['triples']}
             </div>
-            <div className="text-xs text-gray-400">TR</div>
+            <div className="text-xs text-slate-400">TR</div>
           </div>
           <div>
             <div className="text-xl font-bold text-orange-400">
               {sessionCounts['first-9']}
             </div>
-            <div className="text-xs text-gray-400">F9</div>
+            <div className="text-xs text-slate-400">F9</div>
           </div>
           <div>
             <div className="text-xl font-bold text-yellow-400">
               {sessionCounts['solo-501']}
             </div>
-            <div className="text-xs text-gray-400">S01</div>
+            <div className="text-xs text-slate-400">S01</div>
           </div>
           <div>
             <div className="text-xl font-bold text-pink-400">
               {sessionCounts['cricket']}
             </div>
-            <div className="text-xs text-gray-400">SC</div>
+            <div className="text-xs text-slate-400">SC</div>
           </div>
         </div>
       </div>
 
       {/* Universal Metrics — with Share button */}
-      <div className="bg-gray-900 rounded-lg p-4 mb-6 border-2 border-yellow-500">
+      <div className="bg-[#1c1f2e] rounded-lg p-4 mb-6 border-2 border-amber-500">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-pink-400">YOUR METRICS</h3>
           <ShareButton onClick={handleShareTap} />
@@ -474,8 +474,8 @@ export const History = ({ onBack }) => {
 
       {/* Empty state (only if both are empty) */}
       {repsSessions.length === 0 && soloSessions.length === 0 && (
-        <div className="bg-gray-900 rounded-lg p-8 text-center mb-6 border border-gray-800">
-          <p className="text-gray-400 text-sm">
+        <div className="bg-[#1c1f2e] rounded-lg p-8 text-center mb-6 border border-[#2a2f42]">
+          <p className="text-slate-400 text-sm">
             No sessions yet. Complete a training session to see it here!
           </p>
         </div>

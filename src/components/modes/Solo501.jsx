@@ -317,14 +317,14 @@ export const Solo501 = () => {
             {remaining}
           </div>
           <div className="text-left">
-            <div className="text-gray-400 text-xs">
+            <div className="text-slate-400 text-xs">
               Turn: <span className="text-white font-semibold">{turnHistory.length + 1}</span>
             </div>
-            <div className="text-gray-400 text-xs">
+            <div className="text-slate-400 text-xs">
               3DA: <span className="text-white font-semibold">{current3DA}</span>
             </div>
             {consolidated3DA && (
-              <div className="text-gray-400 text-xs">
+              <div className="text-slate-400 text-xs">
                 Avg: <span className="text-gray-500 font-semibold">{consolidated3DA}</span>
               </div>
             )}
@@ -358,7 +358,7 @@ export const Solo501 = () => {
           <div className="mt-4 text-center text-sm">
             {breadcrumbScores.map((turn, i) => (
               <span key={i}>
-                <span className={turn.bust ? 'text-red-400' : 'text-gray-400'}>
+                <span className={turn.bust ? 'text-red-400' : 'text-slate-400'}>
                   {turn.bust ? '✕' : turn.score}
                 </span>
                 {i < breadcrumbScores.length - 1 && <span className="text-gray-700"> → </span>}
@@ -371,7 +371,7 @@ export const Solo501 = () => {
         <div className="mt-6">
           <button
             onClick={handleNewGame}
-            className="w-full py-3 rounded-lg font-bold transition-all bg-gray-800 text-gray-400 hover:bg-gray-700 border border-gray-700"
+            className="w-full py-3 rounded-lg font-bold transition-all bg-[#252a3a] text-slate-400 hover:bg-[#2a2f42] border border-[#2a2f42]"
           >
             <span className="text-sm">🔄 NEW GAME</span>
           </button>

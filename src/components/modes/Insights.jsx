@@ -157,7 +157,7 @@ export const Insights = ({ onBack }) => {
       ? 'text-orange-400'
       : data.direction === 'cold'
       ? 'text-blue-400'
-      : 'text-gray-400';
+      : 'text-slate-400';
     const sign = parseFloat(data.delta) > 0 ? '+' : '';
 
     return (
@@ -194,7 +194,7 @@ export const Insights = ({ onBack }) => {
       </div>
 
       {/* YOUR METRICS */}
-      <div className="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-800">
+      <div className="bg-[#1c1f2e] rounded-lg p-4 mb-6 border border-[#2a2f42]">
         <h3 className="text-lg font-bold mb-4 text-pink-400">YOUR METRICS</h3>
         <div className="grid grid-cols-4 gap-2 text-center">
           <div>
@@ -225,7 +225,7 @@ export const Insights = ({ onBack }) => {
       </div>
 
       {/* METRICS TRENDING — gold border, dominant element */}
-      <div className="bg-gray-900 rounded-lg p-4 mb-6 border-2 border-yellow-500">
+      <div className="bg-[#1c1f2e] rounded-lg p-4 mb-6 border-2 border-amber-500">
         <h3 className="text-lg font-bold mb-4 text-pink-400">METRICS TRENDING</h3>
         <div className="grid grid-cols-2 gap-3">
           {trending.trend3DA ? (
@@ -251,7 +251,7 @@ export const Insights = ({ onBack }) => {
 
       {/* PRACTICE FOCUS */}
       {!dataSufficiency.hasMinimum ? (
-        <div className="bg-gray-900 rounded-lg p-5 border border-gray-800">
+        <div className="bg-[#1c1f2e] rounded-lg p-5 border border-[#2a2f42]">
           <h3 className="text-lg font-bold mb-4 text-pink-400">PRACTICE FOCUS</h3>
           <div className="py-6 text-center">
             <p className="text-gray-500 text-sm mb-2">Insufficient Data</p>
@@ -265,14 +265,14 @@ export const Insights = ({ onBack }) => {
           </div>
         </div>
       ) : (
-        <div className="bg-gray-900 rounded-lg p-5 border border-gray-800">
+        <div className="bg-[#1c1f2e] rounded-lg p-5 border border-[#2a2f42]">
           <h3 className="text-lg font-bold mb-3 text-pink-400">PRACTICE FOCUS</h3>
           <p className="text-sm text-gray-300 mb-4">
             The data says you need to work on {getRegionDescription(weakest[1].name)}.
             Your efficiency there is {((meanScore - weakest[1].score) / meanScore * 100).toFixed(0)}%
             lower than everyplace else on the board.
           </p>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-slate-400">
             Your strongest area is {getRegionDescription(strongest[1].name)},
             where your efficiency is {((strongest[1].score - meanScore) / meanScore * 100).toFixed(0)}%
             greater than the other areas.

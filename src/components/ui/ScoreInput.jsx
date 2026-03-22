@@ -5,7 +5,7 @@ const PURPLE_GRADIENT = {
 };
 
 const GOLD_GRADIENT_BG = {
-  background: 'linear-gradient(45deg, #ffd700, #ffed4a)'
+  background: 'linear-gradient(135deg, #f59e0b, #fcd34d)'
 };
 
 /**
@@ -93,7 +93,7 @@ export const ScoreInput = ({
   };
 
   const btnBase = "py-4 text-xl font-bold text-white";
-  const grayBg = "bg-gray-800 active:bg-gray-700";
+  const grayBg = "bg-[#252a3a] active:bg-[#2a2f42]";
 
   // Mode checks
   const isSolo501 = mode === 'solo501';
@@ -115,9 +115,9 @@ export const ScoreInput = ({
 
       {/* Calculator (collapsible) */}
       {isOpen && (
-        <div className="bg-gray-900 rounded-lg border border-gray-800">
+        <div className="bg-[#1c1f2e] rounded-lg border border-[#2a2f42]">
           {/* Header Row: Back | Display | Score */}
-          <div className="grid grid-cols-3 text-center border-b border-gray-700">
+          <div className="grid grid-cols-3 text-center border-b border-[#2a2f42]">
             <button 
               onClick={handleBack} 
               className={`${btnBase} ${grayBg}`}
@@ -129,7 +129,7 @@ export const ScoreInput = ({
                 {display || '0'}
               </span>
               {hasInput && (display.includes('+') || display.includes('×')) && (
-                <span className="text-sm text-gray-400 ml-1">={currentTotal}</span>
+                <span className="text-sm text-slate-400 ml-1">={currentTotal}</span>
               )}
             </div>
             <button 
@@ -148,7 +148,7 @@ export const ScoreInput = ({
               <button 
                 key={n} 
                 onClick={() => handleNumber(n)} 
-                className={`${btnBase} ${grayBg} border-b border-r border-gray-700`}
+                className={`${btnBase} ${grayBg} border-b border-r border-[#2a2f42]`}
               >
                 {n}
               </button>
@@ -157,8 +157,8 @@ export const ScoreInput = ({
             {/* Dynamic Bottom Row */}
             {hasInput ? (
               <>
-                <button onClick={handleTimes} className={`${btnBase} ${grayBg} border-r border-gray-700`}>×</button>
-                <button onClick={handleZero} className={`${btnBase} ${grayBg} border-r border-gray-700`}>0</button>
+                <button onClick={handleTimes} className={`${btnBase} ${grayBg} border-r border-[#2a2f42]`}>×</button>
+                <button onClick={handleZero} className={`${btnBase} ${grayBg} border-r border-[#2a2f42]`}>0</button>
                 <button onClick={handlePlus} className={`${btnBase} ${grayBg}`}>+</button>
               </>
             ) : isDoubleIn ? (
@@ -171,11 +171,11 @@ export const ScoreInput = ({
               </button>
             ) : (
               <>
-                <button className={`${btnBase} ${grayBg} border-r border-gray-700 cursor-default`}>🤜</button>
+                <button className={`${btnBase} ${grayBg} border-r border-[#2a2f42] cursor-default`}>🤜</button>
                 {showBustButton ? (
-                  <button onClick={handleBust} className={`${btnBase} ${grayBg} border-r border-gray-700`}>{bustLabel}</button>
+                  <button onClick={handleBust} className={`${btnBase} ${grayBg} border-r border-[#2a2f42]`}>{bustLabel}</button>
                 ) : (
-                  <button onClick={handleZero} className={`${btnBase} ${grayBg} border-r border-gray-700`}>0</button>
+                  <button onClick={handleZero} className={`${btnBase} ${grayBg} border-r border-[#2a2f42]`}>0</button>
                 )}
                 <button className={`${btnBase} ${grayBg} cursor-default`}>👈</button>
               </>

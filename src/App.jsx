@@ -47,18 +47,18 @@ const App = () => {
       return (
         <div className="mb-8">
           <div className="flex items-center gap-2">
-            <div className="flex gap-1 bg-gray-900 p-1 rounded-lg border border-gray-800 flex-1">
+            <div className="flex gap-1 bg-[#1c1f2e] p-1 rounded-lg border border-[#2a2f42] flex-1">
               {REPS_MODES.map((mode) => (
                 <button
                   key={mode.id}
                   onClick={() => handleModeChange(mode.id)}
-                  className={`flex-1 py-3 px-2 rounded-md text-xs font-bold transition-all duration-300 ${
-                    currentMode === mode.id 
-                      ? 'text-black shadow-lg transform scale-105' 
-                      : 'text-gray-400 hover:text-gray-200'
+                  className={`flex-1 py-3 px-2 rounded-full text-xs font-bold transition-all duration-300 ${
+                    currentMode === mode.id
+                      ? 'text-[#111114] shadow-lg transform scale-105'
+                      : 'text-slate-400 hover:text-slate-200'
                   }`}
-                  style={currentMode === mode.id 
-                    ? { background: 'linear-gradient(45deg, #ffd700, #ffed4a)' }
+                  style={currentMode === mode.id
+                    ? { background: 'linear-gradient(135deg, #f59e0b, #fcd34d)' }
                     : { background: 'transparent' }
                   }
                 >
@@ -68,7 +68,7 @@ const App = () => {
             </div>
             <button
               onClick={() => handleModeChange(null)}
-              className="p-3 rounded-lg text-gray-400 hover:text-gray-200 bg-gray-900 border border-gray-800 transition-all"
+              className="p-3 rounded-lg text-slate-400 hover:text-gray-200 bg-[#1c1f2e] border border-[#2a2f42] transition-all"
             >
               ⌂
             </button>
@@ -81,18 +81,18 @@ const App = () => {
       return (
         <div className="mb-8">
           <div className="flex items-center gap-2">
-            <div className="flex gap-1 bg-gray-900 p-1 rounded-lg border border-gray-800 flex-1">
+            <div className="flex gap-1 bg-[#1c1f2e] p-1 rounded-lg border border-[#2a2f42] flex-1">
               {SOLO_MODES.map((mode) => (
                 <button
                   key={mode.id}
                   onClick={() => handleModeChange(mode.id)}
-                  className={`flex-1 py-3 px-2 rounded-md text-xs font-bold transition-all duration-300 ${
-                    currentMode === mode.id 
-                      ? 'text-black shadow-lg transform scale-105' 
-                      : 'text-gray-400 hover:text-gray-200'
+                  className={`flex-1 py-3 px-2 rounded-full text-xs font-bold transition-all duration-300 ${
+                    currentMode === mode.id
+                      ? 'text-[#111114] shadow-lg transform scale-105'
+                      : 'text-slate-400 hover:text-slate-200'
                   }`}
-                  style={currentMode === mode.id 
-                    ? { background: 'linear-gradient(45deg, #ffd700, #ffed4a)' }
+                  style={currentMode === mode.id
+                    ? { background: 'linear-gradient(135deg, #f59e0b, #fcd34d)' }
                     : { background: 'transparent' }
                   }
                 >
@@ -102,7 +102,7 @@ const App = () => {
             </div>
             <button
               onClick={() => handleModeChange(null)}
-              className="p-3 rounded-lg text-gray-400 hover:text-gray-200 bg-gray-900 border border-gray-800 transition-all"
+              className="p-3 rounded-lg text-slate-400 hover:text-gray-200 bg-[#1c1f2e] border border-[#2a2f42] transition-all"
             >
               ⌂
             </button>
@@ -115,9 +115,9 @@ const App = () => {
   };
 
   return (
-    <div 
-      className="min-h-screen bg-black text-white p-4"
-      style={{ background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)' }}
+    <div
+      className="min-h-screen text-white p-4"
+      style={{ background: 'linear-gradient(135deg, #111114 0%, #1c1f2e 100%)' }}
     >
       <div className="max-w-md mx-auto">
         {/* Main Menu */}
@@ -133,7 +133,7 @@ const App = () => {
 
         {/* Save Status */}
         {saveStatus && (
-          <div className="bg-gray-900 rounded-lg p-4 mb-8 border border-gray-800">
+          <div className="bg-[#1c1f2e] rounded-lg p-4 mb-8 border border-[#2a2f42]">
             <div className="text-xs text-center text-yellow-300 font-semibold">
               {saveStatus}
             </div>

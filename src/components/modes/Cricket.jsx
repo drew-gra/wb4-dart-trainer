@@ -259,10 +259,10 @@ export const Cricket = () => {
         disabled={isLocked}
         className={`flex-1 py-4 rounded-lg font-bold text-sm transition-all border ${
           isLocked
-            ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+            ? 'bg-[#252a3a] text-gray-600 border-[#2a2f42] cursor-not-allowed'
             : isActive
             ? `${activeColorClass} text-white scale-105 shadow-lg`
-            : `bg-gray-800 ${colorClass} border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105`
+            : `bg-[#252a3a] ${colorClass} border-[#2a2f42] hover:bg-[#2a2f42] hover:border-gray-600 hover:scale-105`
         }`}
       >
         {label}
@@ -278,10 +278,10 @@ export const Cricket = () => {
           disabled={isLocked}
           className={`flex-1 py-4 rounded-lg font-bold text-sm transition-all border ${
             isLocked
-              ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
+              ? 'bg-[#252a3a] text-gray-600 border-[#2a2f42] cursor-not-allowed'
               : isMissPending
               ? 'bg-red-600 text-white border-red-500 scale-105 shadow-lg'
-              : 'bg-gray-800 text-red-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600 hover:scale-105'
+              : 'bg-[#252a3a] text-red-400 border-[#2a2f42] hover:bg-[#2a2f42] hover:border-gray-600 hover:scale-105'
           }`}
         >
           ❌ MISS
@@ -291,7 +291,7 @@ export const Cricket = () => {
           disabled={pendingSelections.length === 0}
           className={`flex-1 py-4 rounded-lg font-bold text-sm transition-all border ${
             pendingSelections.length === 0
-              ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed opacity-50'
+              ? 'bg-[#252a3a] text-gray-600 border-[#2a2f42] cursor-not-allowed opacity-50'
               : 'bg-green-600 text-white border-2 border-green-400 shadow-lg hover:scale-105'
           }`}
         >
@@ -340,14 +340,14 @@ export const Cricket = () => {
             {score}
           </div>
           <div className="text-left">
-            <div className="text-gray-400 text-xs">
+            <div className="text-slate-400 text-xs">
               Darts: <span className="text-white font-semibold">{totalThrows}</span>
             </div>
-            <div className="text-gray-400 text-xs">
+            <div className="text-slate-400 text-xs">
               MPR: <span className="text-white font-semibold">{currentMPR}</span>
             </div>
             {consolidatedMPR && (
-              <div className="text-gray-400 text-xs">
+              <div className="text-slate-400 text-xs">
                 Avg: <span className="text-gray-500 font-semibold">{consolidatedMPR}</span>
               </div>
             )}
@@ -365,7 +365,7 @@ export const Cricket = () => {
               <Fragment key={num}>
                 <div className="flex items-center gap-3">
                   <div className="flex gap-3 flex-1">
-                    <HitButton number="Bull" marksThrown={1} label="BULL" colorClass="text-yellow-400" activeColorClass="bg-yellow-600 border-yellow-500" />
+                    <HitButton number="Bull" marksThrown={1} label="BULL" colorClass="text-yellow-400" activeColorClass="bg-yellow-600 border-amber-500" />
                     <HitButton number="Bull" marksThrown={2} label="D-BULL" colorClass="text-red-400" activeColorClass="bg-red-600 border-red-500" />
                   </div>
                   <MarksDisplay number="Bull" />

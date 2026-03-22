@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 html, body {
-  background-color: #1a1a1a;
+  background-color: #111114;
   padding-top: env(safe-area-inset-top);
 }
 

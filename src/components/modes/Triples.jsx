@@ -113,7 +113,7 @@ export const Triples = () => {
         <div className="text-6xl font-black mb-4" style={GOLD_GRADIENT}>
           {currentTarget || '...'}
         </div>
-        <p className="text-gray-400 text-sm">This is your triples target. Hit as many as you can.</p>
+        <p className="text-slate-400 text-sm">This is your triples target. Hit as many as you can.</p>
       </div>
 
       {/* Round buttons - different layout for Bull vs numbers */}
@@ -153,10 +153,10 @@ export const Triples = () => {
           disabled={attempts.length === 0}
           className={`w-full py-4 rounded-lg font-black text-lg transition-all border-2 shadow-lg ${
             attempts.length === 0
-              ? 'bg-gray-800 text-gray-600 border-gray-700 cursor-not-allowed'
-              : 'text-black border-yellow-400 transform hover:scale-105'
+              ? 'bg-[#252a3a] text-gray-600 border-[#2a2f42] cursor-not-allowed'
+              : 'text-black border-amber-400 transform hover:scale-105'
           }`}
-          style={attempts.length > 0 ? { background: 'linear-gradient(45deg, #ffd700, #ffed4a)' } : {}}
+          style={attempts.length > 0 ? { background: 'linear-gradient(135deg, #f59e0b, #fcd34d)' } : {}}
         >
           💾 SAVE SESSION
         </button>
@@ -176,7 +176,7 @@ export const Triples = () => {
             <span className={`font-semibold ${a.rounds === 0 ? 'text-red-400' : 'text-blue-400'}`}>
               {a.rounds === 0 ? '❌ MISS' : `✅ ${a.number === 'Bull' ? 'C' : 'R'}${a.rounds}`}
             </span>
-            <span className="text-gray-400 text-xs">{a.timestamp}</span>
+            <span className="text-slate-400 text-xs">{a.timestamp}</span>
           </>
         )}
       />

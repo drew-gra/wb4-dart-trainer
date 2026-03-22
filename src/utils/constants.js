@@ -53,7 +53,7 @@ export const TRAINING_MODES = [
 
 // Shared styles
 export const GOLD_GRADIENT = {
-  background: 'linear-gradient(45deg, #ffd700, #ffed4a)',
+  background: 'linear-gradient(135deg, #f59e0b, #fcd34d)',
   WebkitBackgroundClip: 'text',
   WebkitTextFillColor: 'transparent'
 };
