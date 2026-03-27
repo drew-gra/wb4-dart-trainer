@@ -64,10 +64,10 @@ const calculateUnifiedMetrics = (sessions) => {
   return { doubleInPct, checkoutPct, unified3DA, unifiedMPR };
 };
 
-// Calculate trending — last 10 sessions vs overall, requires 50+ qualifying sessions
+// Calculate trending — last 5 sessions vs overall, requires 40+ qualifying sessions
 const calculateTrending = (sessions) => {
-  const WINDOW = 10;
-  const MIN_SESSIONS = 50;
+  const WINDOW = 5;
+  const MIN_SESSIONS = 40;
 
   // 3DA trending: Solo 501 only, weighted by darts thrown
   const all3DA = sessions
@@ -173,7 +173,7 @@ export const Insights = ({ onBack }) => {
           </span>
         </div>
         <div className="text-xs text-gray-500">
-          vs {data.overall} overall (last 10)
+          vs {data.overall} overall (last 5)
         </div>
       </div>
     );
@@ -234,7 +234,7 @@ export const Insights = ({ onBack }) => {
             <div className="p-4 text-center">
               <span className="text-sm font-bold text-gray-300">3DA</span>
               <p className="text-gray-500 text-xs mt-3">Insufficient Data</p>
-              <p className="text-gray-600 text-xs mt-1">{trending.count3DA} of 50</p>
+              <p className="text-gray-600 text-xs mt-1">{trending.count3DA} of 40</p>
             </div>
           )}
           {trending.trendMPR ? (
@@ -243,7 +243,7 @@ export const Insights = ({ onBack }) => {
             <div className="p-4 text-center">
               <span className="text-sm font-bold text-gray-300">MPR</span>
               <p className="text-gray-500 text-xs mt-3">Insufficient Data</p>
-              <p className="text-gray-600 text-xs mt-1">{trending.countMPR} of 50</p>
+              <p className="text-gray-600 text-xs mt-1">{trending.countMPR} of 40</p>
             </div>
           )}
         </div>
