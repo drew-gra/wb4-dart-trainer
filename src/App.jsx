@@ -5,6 +5,8 @@ import { trackEvent } from './utils/analytics';
 import { REPS_MODES, SOLO_MODES } from './utils/constants';
 import { DoubleIn, DoubleOut, Triples, First9, Cricket, Solo501, History, Insights } from './components/modes';
 import MainMenu from './components/ui/MainMenu';
+import ModeTabBar from './components/ui/ModeTabBar';
+import ErrorBoundary from './components/ui/ErrorBoundary';
 
 const App = () => {
   const currentMode = useAppStore(state => state.currentMode);
@@ -42,77 +44,7 @@ const App = () => {
     }
   };
 
-  const renderTabNavigation = () => {
-    if (isRepsMode) {
-      return (
-        <div className="mb-8">
-          <div className="flex items-center gap-2">
-            <div className="flex gap-1 bg-[#1c1f2e] p-1 rounded-lg border border-[#2a2f42] flex-1">
-              {REPS_MODES.map((mode) => (
-                <button
-                  key={mode.id}
-                  onClick={() => handleModeChange(mode.id)}
-                  className={`flex-1 py-3 px-2 rounded-full text-xs font-bold transition-all duration-300 ${
-                    currentMode === mode.id
-                      ? 'text-[#111114] shadow-lg transform scale-105'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                  style={currentMode === mode.id
-                    ? { background: 'linear-gradient(135deg, #f59e0b, #fcd34d)' }
-                    : { background: 'transparent' }
-                  }
-                >
-                  {mode.label}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => handleModeChange(null)}
-              className="p-3 rounded-lg text-slate-400 hover:text-gray-200 bg-[#1c1f2e] border border-[#2a2f42] transition-all"
-            >
-              ⌂
-            </button>
-          </div>
-        </div>
-      );
-    }
-    
-    if (isSoloMode) {
-      return (
-        <div className="mb-8">
-          <div className="flex items-center gap-2">
-            <div className="flex gap-1 bg-[#1c1f2e] p-1 rounded-lg border border-[#2a2f42] flex-1">
-              {SOLO_MODES.map((mode) => (
-                <button
-                  key={mode.id}
-                  onClick={() => handleModeChange(mode.id)}
-                  className={`flex-1 py-3 px-2 rounded-full text-xs font-bold transition-all duration-300 ${
-                    currentMode === mode.id
-                      ? 'text-[#111114] shadow-lg transform scale-105'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                  style={currentMode === mode.id
-                    ? { background: 'linear-gradient(135deg, #f59e0b, #fcd34d)' }
-                    : { background: 'transparent' }
-                  }
-                >
-                  {mode.label}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => handleModeChange(null)}
-              className="p-3 rounded-lg text-slate-400 hover:text-gray-200 bg-[#1c1f2e] border border-[#2a2f42] transition-all"
-            >
-              ⌂
-            </button>
-          </div>
-        </div>
-      );
-    }
-    
-    return null;
-  };
+  const tabModes = isRepsMode ? REPS_MODES : isSoloMode ? SOLO_MODES : null;
 
   return (
     <div
@@ -126,10 +58,19 @@ const App = () => {
         )}
 
         {/* Tab Navigation for Reps/Solo modes */}
-        {renderTabNavigation()}
+        {tabModes && (
+          <ModeTabBar
+            modes={tabModes}
+            currentMode={currentMode}
+            onModeChange={handleModeChange}
+            onHome={() => handleModeChange(null)}
+          />
+        )}
 
         {/* Mode Content */}
-        {renderModeContent()}
+        <ErrorBoundary onReset={() => handleModeChange(null)}>
+          {renderModeContent()}
+        </ErrorBoundary>
 
         {/* Save Status */}
         {saveStatus && (
