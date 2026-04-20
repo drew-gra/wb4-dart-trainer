@@ -278,9 +278,11 @@ export const Solo501 = () => {
     [soloSessions]
   );
 
-  const avgDarts = solo501Sessions.length > 0
-    ? (solo501Sessions.reduce((sum, s) => sum + s.darts, 0) / solo501Sessions.length).toFixed(1)
-    : '0';
+  const avgDarts = useMemo(() => (
+    solo501Sessions.length > 0
+      ? (solo501Sessions.reduce((sum, s) => sum + s.darts, 0) / solo501Sessions.length).toFixed(1)
+      : '0'
+  ), [solo501Sessions]);
 
   const isCheckoutRange = remaining <= 170 && isValidCheckout(remaining);
 

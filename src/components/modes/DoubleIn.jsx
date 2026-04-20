@@ -44,7 +44,7 @@ export const DoubleIn = () => {
     deps: [attempts, sessionStart],
   });
 
-  const stats = calculateStats(attempts);
+  const stats = useMemo(() => calculateStats(attempts), [attempts]);
 
   const handleGotIn = (score) => {
     // Score submitted via ScoreInput = Got In with that score

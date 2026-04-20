@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSessionStore, useAppStore } from '../../store/gameStore';
 import { calculateStats, buildDoubleOutTargetData } from '../../utils/statistics';
 import { generateDoubleOutTarget } from '../../utils/targeting';
@@ -43,7 +43,7 @@ export const DoubleOut = () => {
     deps: [attempts, sessionStart, consecutiveFails, currentTarget],
   });
 
-  const stats = calculateStats(attempts);
+  const stats = useMemo(() => calculateStats(attempts), [attempts]);
 
   const recordAttempt = (outcome) => {
     const now = new Date();

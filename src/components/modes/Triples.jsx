@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSessionStore, useAppStore } from '../../store/gameStore';
 import { calculateTriplesStats, buildTriplesTargetData } from '../../utils/statistics';
 import { generateTriplesTarget } from '../../utils/targeting';
@@ -40,7 +40,7 @@ export const Triples = () => {
     deps: [attempts, sessionStart, currentTarget],
   });
 
-  const stats = calculateTriplesStats(attempts);
+  const stats = useMemo(() => calculateTriplesStats(attempts), [attempts]);
 
   const recordRounds = (rounds) => {
     const now = new Date();

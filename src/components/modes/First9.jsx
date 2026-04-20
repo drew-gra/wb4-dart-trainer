@@ -174,9 +174,11 @@ export const First9 = () => {
     : '—';
 
   // Session average (average of completed instance 3DAs)
-  const sessionAvg3DA = completedInstances.length > 0
-    ? (completedInstances.reduce((sum, avg) => sum + avg, 0) / completedInstances.length).toFixed(1)
-    : '—';
+  const sessionAvg3DA = useMemo(() => (
+    completedInstances.length > 0
+      ? (completedInstances.reduce((sum, avg) => sum + avg, 0) / completedInstances.length).toFixed(1)
+      : '—'
+  ), [completedInstances]);
 
   return (
     <>
