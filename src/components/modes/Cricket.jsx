@@ -334,7 +334,7 @@ export const Cricket = () => {
       />
 
       {/* Score Display - like 501 */}
-      <div className="text-center mb-8">
+      <div className="mb-8 min-h-16 flex items-center justify-center">
         <div className="flex items-center justify-center gap-6">
           <div className="text-6xl font-black" style={GOLD_GRADIENT}>
             {score}

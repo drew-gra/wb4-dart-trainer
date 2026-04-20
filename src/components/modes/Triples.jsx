@@ -109,11 +109,10 @@ export const Triples = () => {
       />
 
       {/* Target Display - no box */}
-      <div className="text-center mb-8">
-        <div className="text-6xl font-black mb-4" style={GOLD_GRADIENT}>
+      <div className="mb-8 min-h-16 flex items-center justify-center">
+        <div className="text-6xl font-black" style={GOLD_GRADIENT}>
           {currentTarget || '...'}
         </div>
-        <p className="text-slate-400 text-sm">This is your triples target. Hit as many as you can.</p>
       </div>
 
       {/* Round buttons - different layout for Bull vs numbers */}

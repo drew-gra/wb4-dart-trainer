@@ -195,7 +195,7 @@ export const First9 = () => {
       />
 
       {/* Running Score Display */}
-      <div className="text-center mb-8">
+      <div className="mb-8 min-h-16 flex items-center justify-center">
         <div className="flex items-center justify-center gap-6">
           <div className="text-6xl font-black" style={GOLD_GRADIENT}>
             {currentInstanceScore}
@@ -217,9 +217,9 @@ export const First9 = () => {
           isOpen={showScoreInput}
           onToggle={() => setShowScoreInput(!showScoreInput)}
           onScore={handleScore}
+          onMiss={() => handleScore(0)}
           onBack={handleUndo}
           canUndo={sessionTurnScores.length > 0}
-          mode="first9"
         />
 
         {/* Spacer */}

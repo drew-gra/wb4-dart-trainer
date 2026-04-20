@@ -122,8 +122,8 @@ export const DoubleOut = () => {
       />
 
       {/* Target Display - no box */}
-      <div className="text-center mb-8">
-        <div className="text-6xl font-black mb-4" style={GOLD_GRADIENT}>
+      <div className="mb-8 min-h-16 flex items-center justify-center">
+        <div className="text-6xl font-black" style={GOLD_GRADIENT}>
           {currentTarget ? `Hit ${displayTarget}` : '...'}
         </div>
       </div>

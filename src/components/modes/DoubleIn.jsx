@@ -135,7 +135,7 @@ export const DoubleIn = () => {
       />
 
       {/* Header - shows last outcome */}
-      <div className="text-center mb-8">
+      <div className="mb-8 min-h-16 flex items-center justify-center">
         {attempts.length === 0 ? (
           <div className="text-4xl font-black" style={GOLD_GRADIENT}>
             GET IN
@@ -157,10 +157,9 @@ export const DoubleIn = () => {
           isOpen={showScoreInput}
           onToggle={() => setShowScoreInput(!showScoreInput)}
           onScore={handleGotIn}
-          onBust={handleMissed}
+          onMiss={handleMissed}
           onBack={handleUndo}
           canUndo={attempts.length > 0}
-          mode="double-in"
         />
 
         {/* Spacer */}
