@@ -132,8 +132,8 @@ export const Insights = ({ onBack }) => {
   const metrics = useMemo(() => calculateUnifiedMetrics(allSessions), [allSessions]);
   const trending = useMemo(() => calculateTrending(allSessions), [allSessions]);
 
-  const dataSufficiency = calculateDataSufficiency(allSessions);
-  const regionalAnalysis = calculateRegionalAnalysis(allSessions);
+  const dataSufficiency = useMemo(() => calculateDataSufficiency(allSessions), [allSessions]);
+  const regionalAnalysis = useMemo(() => calculateRegionalAnalysis(allSessions), [allSessions]);
 
   const sortedRegions = Object.entries(regionalAnalysis).sort((a, b) => a[1].score - b[1].score);
   const weakest = sortedRegions[0];
