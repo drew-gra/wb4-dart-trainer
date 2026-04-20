@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useSessionStore, useAppStore } from '../../store/gameStore';
 import { calculateStats, buildDoubleOutTargetData } from '../../utils/statistics';
 import { generateDoubleOutTarget } from '../../utils/targeting';
 import { trackEvent } from '../../utils/analytics';
+import { useInProgressSession } from '../../hooks/useInProgressSession';
 import { ActionButton } from '../ui/Button';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
 import { SessionSavedOverlay } from '../ui/Overlay';
@@ -20,12 +21,10 @@ export const DoubleOut = () => {
   const addSession = useSessionStore(state => state.addSession);
   const showStatus = useAppStore(state => state.showStatus);
 
-  // Load in-progress session on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const data = JSON.parse(saved);
+  useInProgressSession({
+    storageKey: STORAGE_KEY,
+    onLoad: (data) => {
+      if (data) {
         setAttempts(data.attempts || []);
         setSessionStart(data.sessionStart ? new Date(data.sessionStart) : null);
         setConsecutiveFails(data.consecutiveFails || 0);
@@ -33,23 +32,16 @@ export const DoubleOut = () => {
       } else {
         setCurrentTarget(generateDoubleOutTarget(0));
       }
-    } catch (e) {
-      console.error('Error loading in-progress session:', e);
-      setCurrentTarget(generateDoubleOutTarget(0));
-    }
-  }, []);
-
-  // Save in-progress session whenever attempts change
-  useEffect(() => {
-    if (attempts.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        attempts,
-        sessionStart: sessionStart?.toISOString(),
-        consecutiveFails,
-        currentTarget
-      }));
-    }
-  }, [attempts, sessionStart, consecutiveFails, currentTarget]);
+    },
+    getState: () => ({
+      attempts,
+      sessionStart: sessionStart?.toISOString(),
+      consecutiveFails,
+      currentTarget,
+    }),
+    isActive: attempts.length > 0,
+    deps: [attempts, sessionStart, consecutiveFails, currentTarget],
+  });
 
   const stats = calculateStats(attempts);
 

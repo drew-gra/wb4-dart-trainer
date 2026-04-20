@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, Fragment } from 'react';
 import { useSessionStore, useAppStore } from '../../store/gameStore';
 import { calculateCricketStats } from '../../utils/statistics';
 import { trackEvent } from '../../utils/analytics';
+import { useInProgressSession } from '../../hooks/useInProgressSession';
 import { Button } from '../ui/Button';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
 import { SessionSavedOverlay } from '../ui/Overlay';
@@ -38,39 +39,30 @@ export const Cricket = () => {
   const stats = useMemo(() => calculateCricketStats(cricketSessions), [cricketSessions]);
   const consolidatedMPR = cricketSessions.length > 0 ? stats.avgMPR : null;
 
-  // Load in-progress game on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const data = JSON.parse(saved);
-        setHits(data.hits || { 20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, Bull: 0 });
-        setTotalThrows(data.totalThrows || 0);
-        setMissCount(data.missCount || 0);
-        setScore(data.score || 0);
-        setTotalMarks(data.totalMarks || 0);
-        setGameStart(data.gameStart ? new Date(data.gameStart) : null);
-        setTargetData(data.targetData || {});
-      }
-    } catch (e) {
-      console.error('Error loading in-progress game:', e);
-    }
-  }, []);
-
-  // Save in-progress game whenever state changes
-  useEffect(() => {
-    if (totalThrows > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        hits,
-        totalThrows,
-        missCount,
-        score,
-        totalMarks,
-        gameStart: gameStart?.toISOString(),
-        targetData
-      }));
-    }
-  }, [hits, totalThrows, missCount, score, totalMarks, gameStart, targetData]);
+  useInProgressSession({
+    storageKey: STORAGE_KEY,
+    onLoad: (data) => {
+      if (!data) return;
+      setHits(data.hits || { 20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, Bull: 0 });
+      setTotalThrows(data.totalThrows || 0);
+      setMissCount(data.missCount || 0);
+      setScore(data.score || 0);
+      setTotalMarks(data.totalMarks || 0);
+      setGameStart(data.gameStart ? new Date(data.gameStart) : null);
+      setTargetData(data.targetData || {});
+    },
+    getState: () => ({
+      hits,
+      totalThrows,
+      missCount,
+      score,
+      totalMarks,
+      gameStart: gameStart?.toISOString(),
+      targetData,
+    }),
+    isActive: totalThrows > 0,
+    deps: [hits, totalThrows, missCount, score, totalMarks, gameStart, targetData],
+  });
 
   // Calculate closing marks (capped at 3 per number)
   const closingMarks = Object.values(hits).reduce((sum, count) => sum + Math.min(count, 3), 0);

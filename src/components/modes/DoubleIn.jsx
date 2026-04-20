@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSessionStore, useAppStore } from '../../store/gameStore';
 import { calculateStats } from '../../utils/statistics';
 import { trackEvent } from '../../utils/analytics';
 import { getHotRowScores } from '../../utils/hotrow';
+import { useInProgressSession } from '../../hooks/useInProgressSession';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
 import { SessionSavedOverlay } from '../ui/Overlay';
 import { ScoreInput } from '../ui/ScoreInput';
@@ -28,29 +29,20 @@ export const DoubleIn = () => {
   // Compute dynamic hot row scores from session history
   const hotRowScores = useMemo(() => getHotRowScores(allSessions), [allSessions]);
 
-  // Load in-progress session on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const data = JSON.parse(saved);
-        setAttempts(data.attempts || []);
-        setSessionStart(data.sessionStart ? new Date(data.sessionStart) : null);
-      }
-    } catch (e) {
-      console.error('Error loading in-progress session:', e);
-    }
-  }, []);
-
-  // Save in-progress session whenever attempts change
-  useEffect(() => {
-    if (attempts.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        attempts,
-        sessionStart: sessionStart?.toISOString()
-      }));
-    }
-  }, [attempts, sessionStart]);
+  useInProgressSession({
+    storageKey: STORAGE_KEY,
+    onLoad: (data) => {
+      if (!data) return;
+      setAttempts(data.attempts || []);
+      setSessionStart(data.sessionStart ? new Date(data.sessionStart) : null);
+    },
+    getState: () => ({
+      attempts,
+      sessionStart: sessionStart?.toISOString(),
+    }),
+    isActive: attempts.length > 0,
+    deps: [attempts, sessionStart],
+  });
 
   const stats = calculateStats(attempts);
 

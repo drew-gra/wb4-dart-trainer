@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useSessionStore, useAppStore } from '../../store/gameStore';
 import { calculateTriplesStats, buildTriplesTargetData } from '../../utils/statistics';
 import { generateTriplesTarget } from '../../utils/targeting';
 import { trackEvent } from '../../utils/analytics';
+import { useInProgressSession } from '../../hooks/useInProgressSession';
 import { Button } from '../ui/Button';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
 import { SessionSavedOverlay } from '../ui/Overlay';
@@ -19,34 +20,25 @@ export const Triples = () => {
   const addSession = useSessionStore(state => state.addSession);
   const showStatus = useAppStore(state => state.showStatus);
 
-  // Load in-progress session on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const data = JSON.parse(saved);
+  useInProgressSession({
+    storageKey: STORAGE_KEY,
+    onLoad: (data) => {
+      if (data) {
         setAttempts(data.attempts || []);
         setSessionStart(data.sessionStart ? new Date(data.sessionStart) : null);
         setCurrentTarget(data.currentTarget || generateTriplesTarget());
       } else {
         setCurrentTarget(generateTriplesTarget());
       }
-    } catch (e) {
-      console.error('Error loading in-progress session:', e);
-      setCurrentTarget(generateTriplesTarget());
-    }
-  }, []);
-
-  // Save in-progress session whenever attempts change
-  useEffect(() => {
-    if (attempts.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        attempts,
-        sessionStart: sessionStart?.toISOString(),
-        currentTarget
-      }));
-    }
-  }, [attempts, sessionStart, currentTarget]);
+    },
+    getState: () => ({
+      attempts,
+      sessionStart: sessionStart?.toISOString(),
+      currentTarget,
+    }),
+    isActive: attempts.length > 0,
+    deps: [attempts, sessionStart, currentTarget],
+  });
 
   const stats = calculateTriplesStats(attempts);
 

@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSessionStore, useAppStore } from '../../store/gameStore';
 import { trackEvent } from '../../utils/analytics';
 import { isValidThreeDartScore } from '../../utils/scoring';
 import { getHotRowScores } from '../../utils/hotrow';
+import { useInProgressSession } from '../../hooks/useInProgressSession';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
 import { SessionSavedOverlay, CheckoutOverlay } from '../ui/Overlay';
 import { HotRow } from '../ui/HotRow';
@@ -63,35 +64,26 @@ export const Solo501 = () => {
     return ((501 * solo501Sessions.length / totalDarts) * 3).toFixed(1);
   }, [soloSessions]);
 
-  // Load in-progress game on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const data = JSON.parse(saved);
-        setRemaining(data.remaining || 501);
-        setTurnHistory(data.turnHistory || []);
-        setGameStart(data.gameStart ? new Date(data.gameStart) : null);
-        setCheckoutAttempts(data.checkoutAttempts || 0);
-        setCheckoutSuccesses(data.checkoutSuccesses || 0);
-      }
-    } catch (e) {
-      console.error('Error loading in-progress game:', e);
-    }
-  }, []);
-
-  // Save in-progress game whenever state changes
-  useEffect(() => {
-    if (turnHistory.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        remaining,
-        turnHistory,
-        gameStart: gameStart?.toISOString(),
-        checkoutAttempts,
-        checkoutSuccesses
-      }));
-    }
-  }, [remaining, turnHistory, gameStart, checkoutAttempts, checkoutSuccesses]);
+  useInProgressSession({
+    storageKey: STORAGE_KEY,
+    onLoad: (data) => {
+      if (!data) return;
+      setRemaining(data.remaining || 501);
+      setTurnHistory(data.turnHistory || []);
+      setGameStart(data.gameStart ? new Date(data.gameStart) : null);
+      setCheckoutAttempts(data.checkoutAttempts || 0);
+      setCheckoutSuccesses(data.checkoutSuccesses || 0);
+    },
+    getState: () => ({
+      remaining,
+      turnHistory,
+      gameStart: gameStart?.toISOString(),
+      checkoutAttempts,
+      checkoutSuccesses,
+    }),
+    isActive: turnHistory.length > 0,
+    deps: [remaining, turnHistory, gameStart, checkoutAttempts, checkoutSuccesses],
+  });
 
   // Helper to check if current remaining is a checkout attempt
   const isCheckoutAttemptScore = (score) => {

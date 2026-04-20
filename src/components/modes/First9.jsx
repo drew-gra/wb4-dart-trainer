@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSessionStore, useAppStore } from '../../store/gameStore';
 import { trackEvent } from '../../utils/analytics';
 import { isValidThreeDartScore } from '../../utils/scoring';
 import { getHotRowScores } from '../../utils/hotrow';
+import { useInProgressSession } from '../../hooks/useInProgressSession';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
 import { SessionSavedOverlay } from '../ui/Overlay';
 import { ScoreInput } from '../ui/ScoreInput';
@@ -37,37 +38,28 @@ export const First9 = () => {
   // Compute dynamic hot row scores from session history
   const hotRowScores = useMemo(() => getHotRowScores(allSessions), [allSessions]);
 
-  // Load in-progress session on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const data = JSON.parse(saved);
-        setCurrentInstanceScore(data.currentInstanceScore || 0);
-        setCurrentInstanceTurns(data.currentInstanceTurns || 0);
-        setCurrentInstanceScores(data.currentInstanceScores || []);
-        setCompletedInstances(data.completedInstances || []);
-        setSessionTurnScores(data.sessionTurnScores || []);
-        setSessionStart(data.sessionStart ? new Date(data.sessionStart) : null);
-      }
-    } catch (e) {
-      console.error('Error loading in-progress session:', e);
-    }
-  }, []);
-
-  // Save in-progress session whenever state changes
-  useEffect(() => {
-    if (currentInstanceTurns > 0 || completedInstances.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        currentInstanceScore,
-        currentInstanceTurns,
-        currentInstanceScores,
-        completedInstances,
-        sessionTurnScores,
-        sessionStart: sessionStart?.toISOString()
-      }));
-    }
-  }, [currentInstanceScore, currentInstanceTurns, currentInstanceScores, completedInstances, sessionTurnScores, sessionStart]);
+  useInProgressSession({
+    storageKey: STORAGE_KEY,
+    onLoad: (data) => {
+      if (!data) return;
+      setCurrentInstanceScore(data.currentInstanceScore || 0);
+      setCurrentInstanceTurns(data.currentInstanceTurns || 0);
+      setCurrentInstanceScores(data.currentInstanceScores || []);
+      setCompletedInstances(data.completedInstances || []);
+      setSessionTurnScores(data.sessionTurnScores || []);
+      setSessionStart(data.sessionStart ? new Date(data.sessionStart) : null);
+    },
+    getState: () => ({
+      currentInstanceScore,
+      currentInstanceTurns,
+      currentInstanceScores,
+      completedInstances,
+      sessionTurnScores,
+      sessionStart: sessionStart?.toISOString(),
+    }),
+    isActive: currentInstanceTurns > 0 || completedInstances.length > 0,
+    deps: [currentInstanceScore, currentInstanceTurns, currentInstanceScores, completedInstances, sessionTurnScores, sessionStart],
+  });
 
   const handleScore = (turnScore) => {
     // Validate: must be a possible 3-dart score
