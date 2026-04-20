@@ -119,18 +119,24 @@ export const useSessionStore = create((set, get) => ({
  * Player name/team persist independently from session data.
  * Clearing sessions does NOT clear player identity.
  */
+let statusTimeoutId = null;
+
 export const useAppStore = create((set) => ({
   currentMode: null,
   saveStatus: '',
   playerName: null,
   playerTeam: null,
   nameDeclined: false,
-  
+
   setMode: (mode) => set({ currentMode: mode }),
-  
+
   showStatus: (message, timeout = 2000) => {
+    if (statusTimeoutId) clearTimeout(statusTimeoutId);
     set({ saveStatus: message });
-    setTimeout(() => set({ saveStatus: '' }), timeout);
+    statusTimeoutId = setTimeout(() => {
+      set({ saveStatus: '' });
+      statusTimeoutId = null;
+    }, timeout);
   },
 
   // Load player identity from localStorage
