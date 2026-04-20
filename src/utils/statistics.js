@@ -93,3 +93,53 @@ export const buildTriplesTargetData = (attempts) => {
   });
   return targetData;
 };
+
+/**
+ * Compute the four cross-mode headline metrics: Double-In %, unified
+ * Checkout % (DO reps + Solo 501 checkouts), weighted 3DA (Solo 501
+ * only), and unified MPR (Triples + Cricket).
+ *
+ * Consumed by both the History and Insights views — single source of
+ * truth so changes to any metric formula only land in one place.
+ *
+ * @param {Array} sessions - All completed sessions across modes
+ * @returns {{doubleInPct, checkoutPct, unified3DA, unifiedMPR}}
+ */
+export const calculateUnifiedMetrics = (sessions) => {
+  const diSessions = sessions.filter(s => s.mode === 'double-in');
+  const diTotal = diSessions.reduce((sum, s) => sum + s.totalAttempts, 0);
+  const diSuccesses = diSessions.reduce((sum, s) => sum + s.successes, 0);
+  const doubleInPct = diTotal > 0 ? Math.round((diSuccesses / diTotal) * 100) : '-';
+
+  const doSessions = sessions.filter(s => s.mode === 'double-out');
+  const doTotal = doSessions.reduce((sum, s) => sum + s.totalAttempts, 0);
+  const doSuccesses = doSessions.reduce((sum, s) => sum + s.successes, 0);
+
+  const s501CoSessions = sessions.filter(s => s.mode === 'solo-501' && s.checkoutAttempts);
+  const s501CoTotal = s501CoSessions.reduce((sum, s) => sum + s.checkoutAttempts, 0);
+  const s501CoSuccesses = s501CoSessions.reduce((sum, s) => sum + s.checkoutSuccesses, 0);
+
+  const coTotal = doTotal + s501CoTotal;
+  const coSuccesses = doSuccesses + s501CoSuccesses;
+  const checkoutPct = coTotal > 0 ? Math.round((coSuccesses / coTotal) * 100) : '-';
+
+  const solo501Sessions = sessions.filter(s => s.mode === 'solo-501' && s.darts > 0);
+  const s501TotalDarts = solo501Sessions.reduce((sum, s) => sum + s.darts, 0);
+  const unified3DA = s501TotalDarts > 0
+    ? ((501 * solo501Sessions.length / s501TotalDarts) * 3).toFixed(1)
+    : '-';
+
+  const tripsSessions = sessions.filter(s => s.mode === 'triples');
+  const tripsMarks = tripsSessions.reduce((sum, s) => sum + (parseFloat(s.avgRounds) * s.totalAttempts), 0);
+  const tripsRounds = tripsSessions.reduce((sum, s) => sum + s.totalAttempts, 0);
+
+  const cricketSessions = sessions.filter(s => s.mode === 'cricket');
+  const cricketMarks = cricketSessions.reduce((sum, s) => sum + (s.totalMarks || 21), 0);
+  const cricketRounds = cricketSessions.reduce((sum, s) => sum + (s.throws / 3), 0);
+
+  const totalMarks = tripsMarks + cricketMarks;
+  const totalRounds = tripsRounds + cricketRounds;
+  const unifiedMPR = totalRounds > 0 ? (totalMarks / totalRounds).toFixed(2) : '-';
+
+  return { doubleInPct, checkoutPct, unified3DA, unifiedMPR };
+};

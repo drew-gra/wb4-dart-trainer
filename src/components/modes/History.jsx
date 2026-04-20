@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useSessionStore, useAppStore } from '../../store/gameStore';
 import { GOLD_GRADIENT } from '../../utils/constants';
+import { calculateUnifiedMetrics } from '../../utils/statistics';
 import { NamePromptOverlay } from '../ui/Overlay';
 import { ShareButton, SharePreviewOverlay } from '../ui/ShareTile';
 
@@ -75,50 +76,6 @@ const calculateTotalDarts = (sessions) => {
         return total;
     }
   }, 0);
-};
-
-// Calculate unified metrics from sessions
-const calculateUnifiedMetrics = (sessions) => {
-  // Double-In %
-  const diSessions = sessions.filter(s => s.mode === 'double-in');
-  const diTotal = diSessions.reduce((sum, s) => sum + s.totalAttempts, 0);
-  const diSuccesses = diSessions.reduce((sum, s) => sum + s.successes, 0);
-  const doubleInPct = diTotal > 0 ? Math.round((diSuccesses / diTotal) * 100) : '-';
-
-  // CO% — Unified from Double-Out reps AND Solo 501 checkouts
-  const doSessions = sessions.filter(s => s.mode === 'double-out');
-  const doTotal = doSessions.reduce((sum, s) => sum + s.totalAttempts, 0);
-  const doSuccesses = doSessions.reduce((sum, s) => sum + s.successes, 0);
-
-  const s501Sessions = sessions.filter(s => s.mode === 'solo-501' && s.checkoutAttempts);
-  const s501Total = s501Sessions.reduce((sum, s) => sum + s.checkoutAttempts, 0);
-  const s501Successes = s501Sessions.reduce((sum, s) => sum + s.checkoutSuccesses, 0);
-
-  const coTotal = doTotal + s501Total;
-  const coSuccesses = doSuccesses + s501Successes;
-  const checkoutPct = coTotal > 0 ? Math.round((coSuccesses / coTotal) * 100) : '-';
-
-  // 3DA: Solo 501 only, weighted by darts thrown
-  const solo501Sessions = sessions.filter(s => s.mode === 'solo-501' && s.darts > 0);
-  const s501TotalDarts = solo501Sessions.reduce((sum, s) => sum + s.darts, 0);
-  const unified3DA = s501TotalDarts > 0
-    ? ((501 * solo501Sessions.length / s501TotalDarts) * 3).toFixed(1)
-    : '-';
-
-  // Unified MPR (from Trips + Cricket)
-  const tripsSessions = sessions.filter(s => s.mode === 'triples');
-  const tripsMarks = tripsSessions.reduce((sum, s) => sum + (parseFloat(s.avgRounds) * s.totalAttempts), 0);
-  const tripsRounds = tripsSessions.reduce((sum, s) => sum + s.totalAttempts, 0);
-
-  const cricketSessions = sessions.filter(s => s.mode === 'cricket');
-  const cricketMarks = cricketSessions.reduce((sum, s) => sum + (s.totalMarks || 21), 0);
-  const cricketRounds = cricketSessions.reduce((sum, s) => sum + (s.throws / 3), 0);
-
-  const totalMarks = tripsMarks + cricketMarks;
-  const totalRounds = tripsRounds + cricketRounds;
-  const unifiedMPR = totalRounds > 0 ? (totalMarks / totalRounds).toFixed(2) : '-';
-
-  return { doubleInPct, checkoutPct, unified3DA, unifiedMPR };
 };
 
 // Calculate session counts by mode (single pass)
