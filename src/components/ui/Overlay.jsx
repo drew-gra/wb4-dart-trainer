@@ -4,18 +4,28 @@ import { GOLD_GRADIENT } from '../../utils/constants';
 /**
  * Reusable Overlay component for modals and prompts
  */
-export const Overlay = ({ 
-  isOpen, 
-  onClose, 
-  icon, 
-  title, 
-  subtitle, 
-  children 
+export const Overlay = ({
+  isOpen,
+  onClose,
+  icon,
+  title,
+  subtitle,
+  children,
+  dismissOnBackdropClick = false
 }) => {
   if (!isOpen) return null;
-  
+
+  const handleBackdropClick = (e) => {
+    if (dismissOnBackdropClick && onClose && e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
+    <div
+      className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
+      onClick={handleBackdropClick}
+    >
       <div className="bg-[#1c1f2e] rounded-2xl p-6 border-2 border-amber-500 max-w-sm mx-4">
         <h2 className="text-2xl font-black text-center mb-2" style={GOLD_GRADIENT}>
           {icon} {title}
@@ -46,6 +56,29 @@ export const SessionSavedOverlay = ({ isOpen, onContinue }) => (
       className="w-full py-4 rounded-lg font-bold text-lg bg-[#2a2f42] text-white hover:bg-[#323850] border border-gray-600 transition-all"
     >
       Keep Practicing
+    </button>
+  </Overlay>
+);
+
+/**
+ * Mode Info Overlay - explains what a mode is and how to use it
+ */
+export const ModeInfoOverlay = ({ isOpen, onClose, title, children }) => (
+  <Overlay
+    isOpen={isOpen}
+    onClose={onClose}
+    icon="❓"
+    title={title}
+    dismissOnBackdropClick
+  >
+    <div className="text-sm text-gray-300 leading-relaxed space-y-3 mb-6">
+      {children}
+    </div>
+    <button
+      onClick={onClose}
+      className="w-full py-4 rounded-lg font-bold text-lg bg-[#2a2f42] text-white hover:bg-[#323850] border border-gray-600 transition-all"
+    >
+      Got it
     </button>
   </Overlay>
 );

@@ -5,7 +5,7 @@ import { isValidThreeDartScore } from '../../utils/scoring';
 import { getHotRowScores } from '../../utils/hotrow';
 import { useInProgressSession } from '../../hooks/useInProgressSession';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
-import { SessionSavedOverlay, CheckoutOverlay } from '../ui/Overlay';
+import { SessionSavedOverlay, CheckoutOverlay, ModeInfoOverlay } from '../ui/Overlay';
 import { HotRow } from '../ui/HotRow';
 import { ScoreInput } from '../ui/ScoreInput';
 import { GOLD_GRADIENT } from '../../utils/constants';
@@ -40,7 +40,8 @@ export const Solo501 = () => {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [pendingCheckout, setPendingCheckout] = useState(null);
   const [showSavedOverlay, setShowSavedOverlay] = useState(false);
-  
+  const [showInfo, setShowInfo] = useState(false);
+
   // Checkout tracking for unified CO%
   const [checkoutAttempts, setCheckoutAttempts] = useState(0);
   const [checkoutSuccesses, setCheckoutSuccesses] = useState(0);
@@ -304,6 +305,14 @@ export const Solo501 = () => {
         minDarts={pendingCheckout ? getMinCheckoutDarts(pendingCheckout.remaining) : 1}
       />
 
+      <ModeInfoOverlay
+        isOpen={showInfo}
+        onClose={() => setShowInfo(false)}
+        title="501 SOLO"
+      >
+        <p>Score down from 501, end on a double.</p>
+      </ModeInfoOverlay>
+
       {/* Remaining Score Display */}
       <div className="mb-8 min-h-16 flex items-center justify-center">
         <div className="flex items-center justify-center gap-6">
@@ -373,26 +382,10 @@ export const Solo501 = () => {
       </div>
 
       {/* Stats Section */}
-      <StatsCard title="📊 STATS">
+      <StatsCard title="📊 STATS" onInfoClick={() => setShowInfo(true)}>
         <StatItem value={solo501Sessions.length} label="GAMES" color="yellow" />
         <StatItem value={avgDarts} label="AVG DARTS" useGradient />
       </StatsCard>
-
-      {/* Recent Turns */}
-      {turnHistory.length > 0 && (
-        <RecentList
-          title="🔍 RECENT TURNS"
-          items={turnHistory.slice(0, 10)}
-          renderItem={(turn, i) => (
-            <>
-              <span className={`font-semibold ${turn.bust ? 'text-red-400' : 'text-yellow-400'}`}>
-                {turn.bust ? '💥 BUST' : `+${turn.score}`}
-              </span>
-              <span className="text-white font-semibold">→ {turn.remaining}</span>
-            </>
-          )}
-        />
-      )}
 
       {/* Completed Games */}
       {solo501Sessions.length > 0 && (

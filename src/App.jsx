@@ -48,10 +48,10 @@ const App = () => {
 
   return (
     <div
-      className="min-h-screen text-white p-4"
+      className="min-h-screen flex flex-col text-white p-4"
       style={{ background: 'linear-gradient(135deg, #111114 0%, #1c1f2e 100%)' }}
     >
-      <div className="max-w-md mx-auto">
+      <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
         {/* Main Menu */}
         {currentMode === null && (
           <MainMenu onModeChange={handleModeChange} />
@@ -81,13 +81,12 @@ const App = () => {
           </div>
         )}
 
-        {/* Footer */}
-        <div className="text-center mt-12 mb-12">
-          <div className="text-4xl" style={{ letterSpacing: '0.5em' }}>🤜👈</div>
-        </div>
-        <div className="text-center text-yellow-400 text-xs font-semibold leading-tight">
-          <p>All rights reserved.</p>
-        </div>
+        {/* Footer - home screen only, anchored to bottom */}
+        {currentMode === null && (
+          <div className="text-center text-yellow-400 text-xs font-semibold leading-tight mt-auto pt-12">
+            <p>© Bread & Law, LLC 2026. All rights reserved.</p>
+          </div>
+        )}
       </div>
       <Analytics />
     </div>

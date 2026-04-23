@@ -31,9 +31,20 @@ export const StatItem = ({ value, label, color = 'yellow', useGradient = false }
 /**
  * Stats container card
  */
-export const StatsCard = ({ title, children }) => (
+export const StatsCard = ({ title, children, onInfoClick }) => (
   <div className="bg-[#1c1f2e] rounded-lg p-4 mb-8 border border-[#2a2f42]">
-    <h3 className="text-lg font-bold mb-3 text-pink-400">{title}</h3>
+    <div className="flex justify-between items-center mb-3">
+      <h3 className="text-lg font-bold text-pink-400">{title}</h3>
+      {onInfoClick && (
+        <button
+          onClick={onInfoClick}
+          aria-label="About this mode"
+          className="text-pink-400 text-lg font-bold px-2 hover:opacity-70 transition-opacity"
+        >
+          ?
+        </button>
+      )}
+    </div>
     <div className="grid grid-cols-2 gap-4">
       {children}
     </div>

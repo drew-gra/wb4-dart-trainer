@@ -94,12 +94,22 @@ export const ScoreInput = ({
     <div>
       {/* Collapse Toggle */}
       <div className="flex justify-center">
-        <button
-          onClick={onToggle}
-          className="py-3 px-6 text-yellow-400"
-        >
-          <span className="text-3xl">{isOpen ? '↑' : '↓'}</span>
-        </button>
+        {isOpen ? (
+          <button
+            onClick={onToggle}
+            className="py-3 px-6 text-yellow-400"
+          >
+            <span className="text-3xl">↑</span>
+          </button>
+        ) : (
+          <button
+            onClick={onToggle}
+            className="my-2 px-5 py-2 text-yellow-400 border border-yellow-400/50 rounded-full flex items-center gap-2 hover:border-yellow-400 transition-colors"
+          >
+            <span className="text-sm font-bold tracking-wider">SCORE</span>
+            <span className="text-xl leading-none">↓</span>
+          </button>
+        )}
       </div>
 
       {/* Calculator — only rendered when open, so content below slides up when closed */}

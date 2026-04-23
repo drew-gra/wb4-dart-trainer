@@ -148,22 +148,13 @@ const MainMenu = ({ onModeChange }) => {
             <div className="px-5 pb-2">
               <div className="text-sm text-gray-300 leading-relaxed space-y-4 text-center">
                 <p>
-                  WB4 is a free darts practice app for solo play. It saves and provides analytics on your last 200 solo practice sessions across six modes:
-                </p>
-                <div className="space-y-1 text-yellow-400 font-semibold">
-                  <p>Double-in (DI): Practice getting in</p>
-                  <p>Double-out (DO): Practice getting out</p>
-                  <p>Triples (Trips): Practice hitting cricket marks</p>
-                  <p>First nine (F9): Practice 501 scoring</p>
-                </div>
-                <p>
-                  It also has modes to practice 501 and cricket alone. The targets in DO and Trips are randomized. Using the app over time produces a data-rich profile of the player's strengths, weaknesses, and overall progress.
+                  WB4 is a free darts practice app for solo play. It saves, consolidates, and provides analytics on your last 200 solo practice sessions across training modes.
                 </p>
                 <p>
-                  No account is needed to use the app and all data is exportable. Switching devices or clearing the browser memory will erase all session data.
+                  Used regularly over time, the app can produce a data-based profile of your strengths, weaknesses, and progress. Essentially, you are practicing against your own averages.
                 </p>
                 <p>
-                  Created at The Westbury Inn of the Park Slope Darts League in Brooklyn, New York.
+                  No account is needed to use the app, and you can save/retain your data in one click.
                 </p>
               </div>
             </div>

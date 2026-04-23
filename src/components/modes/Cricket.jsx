@@ -5,7 +5,7 @@ import { trackEvent } from '../../utils/analytics';
 import { useInProgressSession } from '../../hooks/useInProgressSession';
 import { Button } from '../ui/Button';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
-import { SessionSavedOverlay } from '../ui/Overlay';
+import { SessionSavedOverlay, ModeInfoOverlay } from '../ui/Overlay';
 import { GOLD_GRADIENT } from '../../utils/constants';
 
 const BASE_NUMBERS = [20, 19, 18, 17, 16, 15, 'Bull'];
@@ -25,6 +25,7 @@ export const Cricket = () => {
   const [pendingSelections, setPendingSelections] = useState([]);
   const [targetData, setTargetData] = useState({});
   const [showSavedOverlay, setShowSavedOverlay] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   const addSession = useSessionStore(state => state.addSession);
   const soloSessions = useSessionStore(state => state.soloSessions);
@@ -320,10 +321,18 @@ export const Cricket = () => {
   return (
     <>
       {/* Session Saved Overlay */}
-      <SessionSavedOverlay 
-        isOpen={showSavedOverlay} 
-        onContinue={() => setShowSavedOverlay(false)} 
+      <SessionSavedOverlay
+        isOpen={showSavedOverlay}
+        onContinue={() => setShowSavedOverlay(false)}
       />
+
+      <ModeInfoOverlay
+        isOpen={showInfo}
+        onClose={() => setShowInfo(false)}
+        title="CRICKET SOLO"
+      >
+        <p>Close all cricket marks or score points.</p>
+      </ModeInfoOverlay>
 
       {/* Score Display - like 501 */}
       <div className="mb-8 min-h-16 flex items-center justify-center">
@@ -396,7 +405,7 @@ export const Cricket = () => {
         </Button>
       </div>
 
-      <StatsCard title="📊 STATS">
+      <StatsCard title="📊 STATS" onInfoClick={() => setShowInfo(true)}>
         <StatItem value={stats.total} label="GAMES" color="yellow" />
         <StatItem value={stats.avgMPR || '-'} label="AVG MPR" useGradient />
       </StatsCard>

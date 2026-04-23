@@ -5,7 +5,7 @@ import { trackEvent } from '../../utils/analytics';
 import { getHotRowScores } from '../../utils/hotrow';
 import { useInProgressSession } from '../../hooks/useInProgressSession';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
-import { SessionSavedOverlay } from '../ui/Overlay';
+import { SessionSavedOverlay, ModeInfoOverlay } from '../ui/Overlay';
 import { ScoreInput } from '../ui/ScoreInput';
 import { HotRow } from '../ui/HotRow';
 import { GOLD_GRADIENT } from '../../utils/constants';
@@ -17,6 +17,7 @@ export const DoubleIn = () => {
   const [sessionStart, setSessionStart] = useState(null);
   const [showScoreInput, setShowScoreInput] = useState(false);
   const [showSavedOverlay, setShowSavedOverlay] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
   
   const addSession = useSessionStore(state => state.addSession);
   const repsSessions = useSessionStore(state => state.repsSessions);
@@ -126,6 +127,14 @@ export const DoubleIn = () => {
         onContinue={() => setShowSavedOverlay(false)}
       />
 
+      <ModeInfoOverlay
+        isOpen={showInfo}
+        onClose={() => setShowInfo(false)}
+        title="DI REPS MODE"
+      >
+        <p>Practice reps for doubling in. Hit any double, enter your score, and do it again.</p>
+      </ModeInfoOverlay>
+
       {/* Header - shows last outcome */}
       <div className="mb-8 min-h-16 flex items-center justify-center">
         {attempts.length === 0 ? (
@@ -180,7 +189,7 @@ export const DoubleIn = () => {
         </button>
       </div>
 
-      <StatsCard title="📊 STATS">
+      <StatsCard title="📊 STATS" onInfoClick={() => setShowInfo(true)}>
         <StatItem value={stats.total} label="ATTEMPTS" color="yellow" />
         <StatItem value={`${stats.successRate}%`} label="SUCCESS RATE" useGradient />
       </StatsCard>

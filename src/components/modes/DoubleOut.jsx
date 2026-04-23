@@ -6,7 +6,7 @@ import { trackEvent } from '../../utils/analytics';
 import { useInProgressSession } from '../../hooks/useInProgressSession';
 import { ActionButton } from '../ui/Button';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
-import { SessionSavedOverlay } from '../ui/Overlay';
+import { SessionSavedOverlay, ModeInfoOverlay } from '../ui/Overlay';
 import { GOLD_GRADIENT } from '../../utils/constants';
 
 const STORAGE_KEY = 'wb4_inprogress_double_out';
@@ -17,6 +17,7 @@ export const DoubleOut = () => {
   const [currentTarget, setCurrentTarget] = useState(null);
   const [consecutiveFails, setConsecutiveFails] = useState(0);
   const [showSavedOverlay, setShowSavedOverlay] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
   
   const addSession = useSessionStore(state => state.addSession);
   const showStatus = useAppStore(state => state.showStatus);
@@ -113,6 +114,14 @@ export const DoubleOut = () => {
         onContinue={() => setShowSavedOverlay(false)}
       />
 
+      <ModeInfoOverlay
+        isOpen={showInfo}
+        onClose={() => setShowInfo(false)}
+        title="DO REPS MODE"
+      >
+        <p>Practice reps for doubling out. Targets are weighted toward common finishes. Mark each attempt as a hit or miss.</p>
+      </ModeInfoOverlay>
+
       {/* Target Display - no box */}
       <div className="mb-8 min-h-16 flex items-center justify-center">
         <div className="text-6xl font-black" style={GOLD_GRADIENT}>
@@ -151,7 +160,7 @@ export const DoubleOut = () => {
         </button>
       </div>
 
-      <StatsCard title="📊 STATS">
+      <StatsCard title="📊 STATS" onInfoClick={() => setShowInfo(true)}>
         <StatItem value={stats.total} label="ATTEMPTS" color="yellow" />
         <StatItem value={`${stats.successRate}%`} label="SUCCESS RATE" useGradient />
       </StatsCard>

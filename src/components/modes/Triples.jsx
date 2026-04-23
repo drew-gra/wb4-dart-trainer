@@ -6,7 +6,7 @@ import { trackEvent } from '../../utils/analytics';
 import { useInProgressSession } from '../../hooks/useInProgressSession';
 import { Button } from '../ui/Button';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
-import { SessionSavedOverlay } from '../ui/Overlay';
+import { SessionSavedOverlay, ModeInfoOverlay } from '../ui/Overlay';
 import { GOLD_GRADIENT } from '../../utils/constants';
 
 const STORAGE_KEY = 'wb4_inprogress_triples';
@@ -16,6 +16,7 @@ export const Triples = () => {
   const [sessionStart, setSessionStart] = useState(null);
   const [currentTarget, setCurrentTarget] = useState(null);
   const [showSavedOverlay, setShowSavedOverlay] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
   
   const addSession = useSessionStore(state => state.addSession);
   const showStatus = useAppStore(state => state.showStatus);
@@ -100,6 +101,14 @@ export const Triples = () => {
         onContinue={() => setShowSavedOverlay(false)}
       />
 
+      <ModeInfoOverlay
+        isOpen={showInfo}
+        onClose={() => setShowInfo(false)}
+        title="TRIPS REPS MODE"
+      >
+        <p>Practice reps for cricket triples. Hit as many marks as you can. Targets are randomized.</p>
+      </ModeInfoOverlay>
+
       {/* Target Display - no box */}
       <div className="mb-8 min-h-16 flex items-center justify-center">
         <div className="text-6xl font-black" style={GOLD_GRADIENT}>
@@ -153,7 +162,7 @@ export const Triples = () => {
         </button>
       </div>
 
-      <StatsCard title="📊 STATS">
+      <StatsCard title="📊 STATS" onInfoClick={() => setShowInfo(true)}>
         <StatItem value={stats.total} label="ATTEMPTS" color="yellow" />
         <StatItem value={stats.avgRounds} label="AVG MPR" useGradient />
       </StatsCard>

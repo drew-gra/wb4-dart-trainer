@@ -25,22 +25,22 @@ export const BOARD_REGIONS = {
 
 // Main menu categories
 export const MENU_CATEGORIES = [
-  { id: 'reps', label: 'REPS', description: 'Repetition drills with assigned targets', defaultMode: 'double-in' },
-  { id: 'solo', label: 'SOLO', description: 'Full game simulations', defaultMode: 'cricket' },
+  { id: 'reps', label: 'REPS', description: 'Repetition drills with assigned targets', defaultMode: 'double-out' },
+  { id: 'solo', label: 'SOLO', description: 'Full game simulations', defaultMode: 'solo-501' },
 ];
 
 // Reps modes (repetition-based drills)
 export const REPS_MODES = [
-  { id: 'double-in', label: 'DI' },
   { id: 'double-out', label: 'DO' },
-  { id: 'triples', label: 'TRIPS' },
   { id: 'first-9', label: 'F9' },
+  { id: 'triples', label: 'TRIPS' },
+  { id: 'double-in', label: 'DI' },
 ];
 
 // Solo modes (full game simulations)
 export const SOLO_MODES = [
-  { id: 'cricket', label: 'CRICKET' },
   { id: 'solo-501', label: '501' },
+  { id: 'cricket', label: 'CRICKET' },
 ];
 
 // Legacy export for backwards compatibility

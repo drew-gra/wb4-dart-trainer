@@ -5,7 +5,7 @@ import { isValidThreeDartScore } from '../../utils/scoring';
 import { getHotRowScores } from '../../utils/hotrow';
 import { useInProgressSession } from '../../hooks/useInProgressSession';
 import { StatsCard, StatItem, RecentList } from '../ui/StatCard';
-import { SessionSavedOverlay } from '../ui/Overlay';
+import { SessionSavedOverlay, ModeInfoOverlay } from '../ui/Overlay';
 import { ScoreInput } from '../ui/ScoreInput';
 import { HotRow } from '../ui/HotRow';
 import { GOLD_GRADIENT } from '../../utils/constants';
@@ -26,6 +26,7 @@ export const First9 = () => {
   // UI state
   const [showScoreInput, setShowScoreInput] = useState(false);
   const [showSavedOverlay, setShowSavedOverlay] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   const addSession = useSessionStore(state => state.addSession);
   const repsSessions = useSessionStore(state => state.repsSessions);
@@ -183,10 +184,18 @@ export const First9 = () => {
   return (
     <>
       {/* Session Saved Overlay */}
-      <SessionSavedOverlay 
-        isOpen={showSavedOverlay} 
-        onContinue={() => setShowSavedOverlay(false)} 
+      <SessionSavedOverlay
+        isOpen={showSavedOverlay}
+        onContinue={() => setShowSavedOverlay(false)}
       />
+
+      <ModeInfoOverlay
+        isOpen={showInfo}
+        onClose={() => setShowInfo(false)}
+        title="F9 REPS MODE"
+      >
+        <p>Practice reps for the front of a 501 leg. Play three turns and enter each score.</p>
+      </ModeInfoOverlay>
 
       {/* Running Score Display */}
       <div className="mb-8 min-h-16 flex items-center justify-center">
@@ -255,7 +264,7 @@ export const First9 = () => {
       </div>
 
       {/* Stats Section */}
-      <StatsCard title="📊 STATS">
+      <StatsCard title="📊 STATS" onInfoClick={() => setShowInfo(true)}>
         <StatItem value={completedInstances.length} label="ATTEMPTS" color="yellow" />
         <StatItem value={sessionAvg3DA} label="AVG 3DA" useGradient />
       </StatsCard>
